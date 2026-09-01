@@ -12,10 +12,14 @@ from geotoolsgr import (
     PolygonCalculator,
     ShapefileExporter,
     extract_shapefile_candidates,
+    export_dxf_file,
     format_hatt_angle,
     is_epsg2100_prj,
     safe_point_name,
     shapefile_text_encoding,
+    load_user_settings,
+    save_user_settings,
+    configured_default_region,
 )
 
 
@@ -136,3 +140,40 @@ def test_shapefile_cpg_cp1253(tmp_path: Path):
     shp.touch()
     shp.with_suffix(".cpg").write_text("1253", encoding="ascii")
     assert shapefile_text_encoding(str(shp)) == "cp1253"
+
+
+def test_user_settings_roundtrip_and_default_region(tmp_path: Path):
+    settings_file = tmp_path / "settings.json"
+    saved = {"default_hatt_region": "ΚΑΤΕΡΙΝΗ", "default_hatt_code": HATT_COEFFICIENTS["ΚΑΤΕΡΙΝΗ"]["code"]}
+    assert save_user_settings(saved, settings_file) == settings_file
+    loaded = load_user_settings(settings_file)
+    assert loaded == saved
+    assert configured_default_region(loaded) == "ΚΑΤΕΡΙΝΗ"
+
+
+def test_invalid_saved_hatt_region_falls_back_to_builtin_default():
+    assert configured_default_region({"default_hatt_region": "ΔΕΝ ΥΠΑΡΧΕΙ"}) == "ΚΑΤΕΡΙΝΗ"
+
+
+def test_dxf_export_options_control_points_and_labels(tmp_path: Path):
+    pytest.importorskip("ezdxf")
+    import ezdxf
+
+    pts = [P("A", 400000, 4400000), P("B", 400100, 4400000), P("C", 400100, 4400100)]
+
+    clean_path = tmp_path / "clean.dxf"
+    info = export_dxf_file(pts, str(clean_path))
+    assert info["layers"] == ["EGSA_BOUNDARY"]
+    doc = ezdxf.readfile(clean_path)
+    msp = doc.modelspace()
+    assert len(msp.query("LWPOLYLINE")) == 1
+    assert len(msp.query("POINT")) == 0
+    assert len(msp.query("TEXT")) == 0
+
+    full_path = tmp_path / "full.dxf"
+    info = export_dxf_file(pts, str(full_path), include_points=True, include_labels=True)
+    assert info["layers"] == ["EGSA_BOUNDARY", "EGSA_POINTS", "EGSA_LABELS"]
+    doc = ezdxf.readfile(full_path)
+    msp = doc.modelspace()
+    assert len(msp.query("POINT")) == 3
+    assert len(msp.query("TEXT")) == 3

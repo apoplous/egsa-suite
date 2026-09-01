@@ -1,6 +1,6 @@
 """
 EGSA Suite – Coordinate Transformation Suite
-Version 5.4.0-beta.1 - Public Release Candidate
+Version 5.4.0-beta.2 - Public Release Candidate
 Author: D.T. 2026
 
 Μετατροπή συντεταγμένων από το τοπικό σύστημα HATT στο ΕΓΣΑ87
@@ -170,7 +170,7 @@ def _show_splash() -> tk.Toplevel | None:
                                           fill="#8fbc8f", outline="")
 
         # ── Version ──
-        c.create_text(TX, 248, text="v5.4.0-beta.1  ·  390 εγγραφές HATT  ·  2026",
+        c.create_text(TX, 248, text="v5.4.0-beta.2  ·  390 εγγραφές HATT  ·  2026",
                       font=("Segoe UI", 8), fill="#2a6e3f", anchor="w")
 
         splash.update()
@@ -235,6 +235,7 @@ except ImportError:
 import string
 import re
 import codecs
+import json
 _update_splash(_splash, "Φόρτωση matplotlib...", 0.30)
 import matplotlib.pyplot as plt
 from matplotlib.ticker import ScalarFormatter
@@ -280,7 +281,7 @@ _GE_WORK_DIR = Path(_tempfile.gettempdir()) / "egsa_suite_ge"
 # ==================== CONFIGURATION ====================
 
 getcontext().prec = 34
-APP_VERSION = "5.4.0-beta.1"
+APP_VERSION = "5.4.0-beta.2"
 DISPLAY_DEC = Decimal("0.01")
 
 # ── Χρωματική παλέτα ─────────────────────────────────────────────────────────
@@ -390,6 +391,58 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+# ==================== USER SETTINGS ====================
+
+def get_settings_path() -> Path:
+    """Επιστρέφει το per-user αρχείο ρυθμίσεων χωρίς να γράφει δίπλα στο EXE."""
+    override = os.environ.get("EGSA_SUITE_SETTINGS_DIR")
+    if override:
+        base = Path(override)
+    elif sys.platform == "win32":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        base = Path(local_app_data) if local_app_data else (Path.home() / "AppData" / "Local")
+        base = base / "EGSA Suite"
+    else:
+        base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "egsa-suite"
+    return base / "settings.json"
+
+
+def load_user_settings(path: Optional[Path] = None) -> dict:
+    """Φορτώνει ρυθμίσεις χρήστη. Κατεστραμμένο/ανύπαρκτο αρχείο αγνοείται με ασφάλεια."""
+    settings_path = Path(path) if path is not None else get_settings_path()
+    try:
+        if not settings_path.exists():
+            return {}
+        data = json.loads(settings_path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception as exc:
+        logger.warning("Could not load user settings from %s: %s", settings_path, exc)
+        return {}
+
+
+def save_user_settings(settings: dict, path: Optional[Path] = None) -> Path:
+    """Αποθηκεύει atomically τις ρυθμίσεις χρήστη και επιστρέφει το path."""
+    settings_path = Path(path) if path is not None else get_settings_path()
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = settings_path.with_suffix(settings_path.suffix + ".tmp")
+    tmp_path.write_text(
+        json.dumps(settings, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    tmp_path.replace(settings_path)
+    return settings_path
+
+
+def configured_default_region(settings: Optional[dict] = None) -> str:
+    """Επιστρέφει έγκυρη αποθηκευμένη περιοχή ή την ασφαλή ενσωματωμένη προεπιλογή."""
+    data = settings if settings is not None else load_user_settings()
+    region = data.get("default_hatt_region") if isinstance(data, dict) else None
+    if region in HATT_COEFFICIENTS:
+        return region
+    return DEFAULT_REGION
+
 
 # Temporary files cleanup
 temp_files = []
@@ -855,6 +908,59 @@ def extract_shapefile_candidates(reader) -> list:
     return candidates
 
 
+def export_dxf_file(points: List[Point], dxf_path: str, *, include_points: bool = False, include_labels: bool = False) -> dict:
+    """
+    Εξάγει ΕΓΣΑ87 γεωμετρία σε DXF. Η polyline δημιουργείται πάντα, ενώ POINT/TEXT
+    entities προστίθενται μόνο όταν ζητηθούν ρητά από τον χρήστη.
+    """
+    if not DXF_AVAILABLE:
+        raise RuntimeError("Η βιβλιοθήκη ezdxf δεν είναι διαθέσιμη σε αυτή την εγκατάσταση.")
+    if len(points) < 2:
+        raise ValueError("Για DXF απαιτούνται τουλάχιστον δύο σημεία ώστε να δημιουργηθεί γραμμή.")
+
+    doc = ezdxf.new('R2010')
+    doc.units = dxf_units.M
+    msp = doc.modelspace()
+
+    layers = ["EGSA_BOUNDARY"]
+    doc.layers.add('EGSA_BOUNDARY', color=1)
+    if include_points:
+        doc.layers.add('EGSA_POINTS', color=5)
+        layers.append("EGSA_POINTS")
+    if include_labels:
+        doc.layers.add('EGSA_LABELS', color=3)
+        layers.append("EGSA_LABELS")
+
+    pts = [(float(p.x), float(p.y)) for p in points]
+    msp.add_lwpolyline(
+        pts,
+        close=(len(pts) >= 3),
+        dxfattribs={'layer': 'EGSA_BOUNDARY'}
+    )
+
+    xs = [xy[0] for xy in pts]
+    ys = [xy[1] for xy in pts]
+    span = max(max(xs) - min(xs), max(ys) - min(ys))
+    txt_h = max(0.5, min(span * 0.015, 5.0)) if span else 1.0
+
+    for point, (x, y) in zip(points, pts):
+        if include_points:
+            msp.add_point((x, y), dxfattribs={'layer': 'EGSA_POINTS'})
+        if include_labels:
+            msp.add_text(point.name, dxfattribs={
+                'layer': 'EGSA_LABELS',
+                'height': txt_h,
+                'insert': (x + txt_h * 0.5, y + txt_h * 0.5),
+            })
+
+    doc.saveas(dxf_path)
+    return {
+        "geometry": "κλειστή polyline" if len(pts) >= 3 else "ανοικτή polyline",
+        "layers": layers,
+        "vertex_count": len(pts),
+    }
+
+
 # ==================== UTILITY FUNCTIONS ====================
 
 def format_display(d: Decimal) -> str:
@@ -921,8 +1027,14 @@ class HATTEgsaApp:
         self.root.configure(bg=C["bg"])
         setup_styles(root)
         
+        # Per-user settings (αποθηκεύονται στο AppData, όχι δίπλα στο portable EXE)
+        self.user_settings = load_user_settings()
+        self.default_region = configured_default_region(self.user_settings)
+
         # Core components
         self.transformer = CoordinateTransformer()
+        if HATT_COEFFICIENTS:
+            self.transformer.set_region(self.default_region)
         self.calculator = PolygonCalculator()
         self.parser = InputParser()
         self.exporter = ShapefileExporter()
@@ -1079,7 +1191,8 @@ class HATTEgsaApp:
         self._region_name_to_display = {
             name: display for display, name in self._region_display_to_name.items()
         }
-        default_display = self._region_name_to_display.get(DEFAULT_REGION, DEFAULT_REGION)
+        default_region = self.default_region if self.default_region in self._region_name_to_display else DEFAULT_REGION
+        default_display = self._region_name_to_display.get(default_region, default_region)
 
         self.region_var = tk.StringVar(master=self.root, value=default_display)
         self.region_combo = ttk.Combobox(
@@ -1094,10 +1207,28 @@ class HATTEgsaApp:
 
         self.region_code_lbl = tk.Label(
             region_row,
-            text=self._region_info_text(DEFAULT_REGION),
+            text=self._region_info_text(default_region),
             font=("Segoe UI", 8), fg=C["text_dim"], bg=C["bg"]
         )
         self.region_code_lbl.pack(side="left", padx=(10, 0))
+
+        preference_row = tk.Frame(region_outer, bg=C["bg"])
+        preference_row.pack(fill="x", pady=(4, 0))
+        self.default_region_lbl = tk.Label(
+            preference_row,
+            text=f"Προεπιλογή: {default_display}",
+            font=("Segoe UI", 7), fg=C["text_dim"], bg=C["bg"]
+        )
+        self.default_region_lbl.pack(side="left")
+        tk.Button(
+            preference_row,
+            text="★ Ορισμός ως προεπιλογή",
+            command=self._set_current_region_as_default,
+            relief="flat", bd=0,
+            bg=C["green_light"], fg=C["green_dark"],
+            activebackground=C["accent"], activeforeground=C["green_dark"],
+            font=("Segoe UI", 7), padx=8, pady=2, cursor="hand2"
+        ).pack(side="right")
 
         # ── Separator ─────────────────────────────────────────────────────────
         tk.Frame(frame, bg=C["border"], height=1).pack(fill="x", padx=12, pady=(6, 0))
@@ -1811,14 +1942,97 @@ class HATTEgsaApp:
             logger.exception("Shapefile export failed")
             messagebox.showerror("Σφάλμα Shapefile", f"Αποτυχία εξαγωγής:\n{e}")
 
+    def _choose_dxf_export_options(self):
+        """Modal επιλογές για POINT/TEXT entities στο DXF. Η βασική γεωμετρία εξάγεται πάντα."""
+        result = {"value": None}
+
+        win = tk.Toplevel(self.root)
+        win.title("Επιλογές εξαγωγής DXF")
+        win.configure(bg=C["bg"])
+        win.transient(self.root)
+        win.resizable(False, False)
+        win.grab_set()
+
+        include_points_var = tk.BooleanVar(master=win, value=False)
+        include_labels_var = tk.BooleanVar(master=win, value=False)
+
+        body = tk.Frame(win, bg=C["bg"])
+        body.pack(fill="both", expand=True, padx=18, pady=16)
+
+        tk.Label(
+            body, text="Επιλογές DXF",
+            font=("Segoe UI", 11, "bold"), fg=C["text"], bg=C["bg"]
+        ).pack(anchor="w")
+        tk.Label(
+            body,
+            text="Η γραμμή / το πολύγωνο εξάγεται πάντα στο layer EGSA_BOUNDARY.",
+            font=("Segoe UI", 8), fg=C["text_dim"], bg=C["bg"]
+        ).pack(anchor="w", pady=(2, 10))
+
+        tk.Checkbutton(
+            body, text="Εξαγωγή ξεχωριστών σημείων κορυφών (POINT)",
+            variable=include_points_var,
+            bg=C["bg"], fg=C["text"], selectcolor=C["white"],
+            activebackground=C["bg"], font=("Segoe UI", 9)
+        ).pack(anchor="w", pady=3)
+
+        tk.Checkbutton(
+            body, text="Εξαγωγή ονομάτων κορυφών (TEXT)",
+            variable=include_labels_var,
+            bg=C["bg"], fg=C["text"], selectcolor=C["white"],
+            activebackground=C["bg"], font=("Segoe UI", 9)
+        ).pack(anchor="w", pady=3)
+
+        buttons = tk.Frame(body, bg=C["bg"])
+        buttons.pack(fill="x", pady=(14, 0))
+
+        def confirm():
+            result["value"] = (include_points_var.get(), include_labels_var.get())
+            win.destroy()
+
+        def cancel():
+            result["value"] = None
+            win.destroy()
+
+        tk.Button(
+            buttons, text="Ακύρωση", command=cancel,
+            relief="flat", bg=C["output_bg"], fg=C["text"],
+            font=("Segoe UI", 9), padx=12, pady=5
+        ).pack(side="right")
+        tk.Button(
+            buttons, text="Συνέχεια", command=confirm,
+            relief="flat", bg=C["green_mid"], fg=C["white"],
+            activebackground=C["green_dark"], activeforeground=C["white"],
+            font=("Segoe UI", 9, "bold"), padx=14, pady=5
+        ).pack(side="right", padx=(0, 8))
+
+        win.protocol("WM_DELETE_WINDOW", cancel)
+        win.update_idletasks()
+        x = self.root.winfo_rootx() + max(0, (self.root.winfo_width() - win.winfo_reqwidth()) // 2)
+        y = self.root.winfo_rooty() + max(0, (self.root.winfo_height() - win.winfo_reqheight()) // 2)
+        win.geometry(f"+{x}+{y}")
+        self.root.wait_window(win)
+        return result["value"]
+
     def _export_dxf(self):
-        """Εξαγωγή DXF: μία polyline και προαιρετικά ονόματα κορυφών, χωρίς POINT entities."""
+        """Εξαγωγή DXF με προαιρετικά POINT entities και ονόματα κορυφών."""
         if not self.egsa_points:
             messagebox.showerror(MESSAGES['error_title'], "Δεν υπάρχουν σημεία.")
             return
         if not DXF_AVAILABLE:
             messagebox.showerror("DXF", "Η βιβλιοθήκη ezdxf δεν είναι διαθέσιμη σε αυτή την εγκατάσταση.")
             return
+        if len(self.egsa_points) < 2:
+            messagebox.showwarning(
+                "Εξαγωγή DXF",
+                "Για DXF απαιτούνται τουλάχιστον δύο σημεία ώστε να δημιουργηθεί γραμμή."
+            )
+            return
+
+        options = self._choose_dxf_export_options()
+        if options is None:
+            return
+        include_points, include_labels = options
 
         dxf_path = filedialog.asksaveasfilename(
             defaultextension=".dxf",
@@ -1829,49 +2043,22 @@ class HATTEgsaApp:
             return
 
         try:
-            doc = ezdxf.new('R2010')
-            doc.units = dxf_units.M
-            msp = doc.modelspace()
-
-            doc.layers.add('EGSA_BOUNDARY', color=1)
-            doc.layers.add('EGSA_LABELS', color=3)
-
-            pts = [(float(p.x), float(p.y)) for p in self.egsa_points]
-            if len(pts) == 1:
-                messagebox.showwarning(
-                    "Εξαγωγή DXF",
-                    "Για DXF απαιτούνται τουλάχιστον δύο σημεία ώστε να δημιουργηθεί γραμμή."
-                )
-                return
-
-            msp.add_lwpolyline(
-                pts,
-                close=(len(pts) >= 3),
-                dxfattribs={'layer': 'EGSA_BOUNDARY'}
+            info = export_dxf_file(
+                self.egsa_points, dxf_path,
+                include_points=include_points,
+                include_labels=include_labels,
             )
-
-            xs = [xy[0] for xy in pts]
-            ys = [xy[1] for xy in pts]
-            span = max(max(xs) - min(xs), max(ys) - min(ys))
-            txt_h = max(0.5, min(span * 0.015, 5.0)) if span else 1.0
-
-            for point, (x, y) in zip(self.egsa_points, pts):
-                msp.add_text(point.name, dxfattribs={
-                    'layer': 'EGSA_LABELS',
-                    'height': txt_h,
-                    'insert': (x + txt_h * 0.5, y + txt_h * 0.5),
-                })
-
-            doc.saveas(dxf_path)
-            geometry = "κλειστή polyline" if len(pts) >= 3 else "ανοικτή polyline"
             messagebox.showinfo(
                 "Εξαγωγή DXF",
                 f"Η εξαγωγή ολοκληρώθηκε επιτυχώς.\n\n"
-                f"Γεωμετρία: {geometry}\n"
-                f"Layers: EGSA_BOUNDARY, EGSA_LABELS\n"
+                f"Γεωμετρία: {info['geometry']}\n"
+                f"Layers: {', '.join(info['layers'])}\n"
                 f"Σύστημα: ΕΓΣΑ87 · μονάδες σε μέτρα"
             )
-            logger.info(f"DXF exported: {dxf_path}")
+            logger.info(
+                "DXF exported: %s points=%s labels=%s",
+                dxf_path, include_points, include_labels
+            )
 
         except Exception as e:
             messagebox.showerror("Σφάλμα DXF", f"Αποτυχία εξαγωγής:\n{e}")
@@ -2212,6 +2399,38 @@ class HATTEgsaApp:
         phi_s = format_hatt_angle(d.get('phi0'))
         lam_s = format_hatt_angle(d.get('lam0'))
         return f"φ₀={phi_s}   λ₀={lam_s} από Αθήνα"
+
+    def _set_current_region_as_default(self) -> None:
+        """Αποθηκεύει το τρέχον φύλλο HATT ως per-user προεπιλογή."""
+        display_value = self.region_var.get()
+        region = self._region_display_to_name.get(display_value, display_value)
+        if region not in HATT_COEFFICIENTS:
+            messagebox.showerror("Προεπιλογή HATT", "Δεν είναι δυνατή η αποθήκευση της επιλεγμένης περιοχής.")
+            return
+
+        new_settings = dict(self.user_settings)
+        new_settings["default_hatt_region"] = region
+        new_settings["default_hatt_code"] = HATT_COEFFICIENTS[region].get("code")
+        try:
+            settings_path = save_user_settings(new_settings)
+        except Exception as exc:
+            logger.exception("Could not save default HATT region")
+            messagebox.showerror(
+                "Προεπιλογή HATT",
+                f"Δεν ήταν δυνατή η αποθήκευση της προεπιλογής:\n{exc}"
+            )
+            return
+
+        self.user_settings = new_settings
+        self.default_region = region
+        default_display = self._region_name_to_display.get(region, region)
+        self.default_region_lbl.config(text=f"Προεπιλογή: {default_display}")
+        logger.info("Default HATT region saved: %s (%s)", region, settings_path)
+        messagebox.showinfo(
+            "Προεπιλογή HATT",
+            f"Το φύλλο «{default_display}» ορίστηκε ως προεπιλογή.\n\n"
+            "Θα επιλέγεται αυτόματα στην επόμενη εκκίνηση του EGSA Suite."
+        )
 
     def _on_region_changed(self, event=None) -> None:
         """Καλείται όταν ο χρήστης επιλέγει νέο φύλλο HATT."""
@@ -2573,7 +2792,7 @@ class HATTEgsaApp:
         help_text = """1. ΕΠΙΛΟΓΗ ΛΕΙΤΟΥΡΓΙΑΣ
 
 Μετατροπή HATT → ΕΓΣΑ87
-Επίλεξε το σωστό φύλλο HATT από τη λίστα, όπου εμφανίζονται μαζί ο αριθμός φύλλου και η περιοχή. Έπειτα εισήγαγε τις τοπικές συντεταγμένες και πάτησε «Μετατροπή σε ΕΓΣΑ87».
+Επίλεξε το σωστό φύλλο HATT από τη λίστα, όπου εμφανίζονται μαζί ο αριθμός φύλλου και η περιοχή. Αν το χρησιμοποιείς συχνά, πάτησε «Ορισμός ως προεπιλογή» ώστε να επιλέγεται αυτόματα στις επόμενες εκκινήσεις του προγράμματος. Έπειτα εισήγαγε τις τοπικές συντεταγμένες και πάτησε «Μετατροπή σε ΕΓΣΑ87».
 
 Δημιουργία πολυγώνου ΕΓΣΑ87
 Χρησιμοποίησέ την όταν οι συντεταγμένες είναι ήδη σε ΕΓΣΑ87 ή όταν εισάγονται από Shapefile ή DXF.
@@ -2619,9 +2838,11 @@ class HATTEgsaApp:
 
 8. ΕΞΑΓΩΓΗ DXF
 
-Δημιουργούνται:
-• EGSA_BOUNDARY — ανοικτή ή κλειστή LWPOLYLINE.
+Η βασική γεωμετρία εξάγεται πάντα στο layer EGSA_BOUNDARY ως ανοικτή ή κλειστή LWPOLYLINE. Πριν από την αποθήκευση μπορείς προαιρετικά να προσθέσεις:
+• EGSA_POINTS — ξεχωριστά POINT entities στις κορυφές.
 • EGSA_LABELS — ονόματα κορυφών ως TEXT.
+
+Οι δύο προαιρετικές επιλογές είναι απενεργοποιημένες από προεπιλογή για καθαρότερο DXF.
 
 9. ΕΠΑΓΓΕΛΜΑΤΙΚΟΣ ΕΛΕΓΧΟΣ
 

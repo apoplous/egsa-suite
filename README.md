@@ -4,7 +4,7 @@
 HATT → EGSA87 transformations, EGSA87 geometry tools, Shapefile/DXF exchange, map preview and
 Google Earth Pro integration.
 
-> **Current public-release candidate:** `v5.4.0-beta.1`
+> **Current public-release candidate:** `v5.4.0-beta.2`
 
 ![EGSA Suite UI](docs/egsa-suite-ui.png)
 
@@ -19,6 +19,7 @@ GIS, CAD και Google Earth. Στόχος είναι να είναι ένα π�
 ## Δυνατότητες
 
 - HATT → ΕΓΣΑ87 με 390 εγγραφές πολυωνυμικού μετασχηματισμού.
+- Επιλογή και μόνιμη αποθήκευση προεπιλεγμένου φύλλου HATT ανά χρήστη.
 - Άμεση εισαγωγή/επεξεργασία συντεταγμένων ΕΓΣΑ87.
 - Εμβαδόν, αποστάσεις και οπτικός έλεγχος πολυγώνου.
 - Έλεγχος αυτοτομών και βασικών σφαλμάτων γεωμετρίας πριν από export.
@@ -26,6 +27,7 @@ GIS, CAD και Google Earth. Στόχος είναι να είναι ένα π�
 - Ασφαλής επιλογή feature/part σε multi-feature ή multipart Shapefile.
 - Ανάγνωση κοινών `.cpg` encodings για παλαιότερα ελληνικά DBF attributes (π.χ. CP1253).
 - Import/export DXF με επιλογή polyline και έλεγχο μονάδων/εύρους.
+- Στην εξαγωγή DXF, τα POINT entities και τα ονόματα κορυφών (TEXT) είναι ανεξάρτητες προαιρετικές επιλογές.
 - Προβολή σε χάρτη και Google Maps.
 - Google Earth Pro live NetworkLink και camera tracking μέσω local-only HTTP server (`127.0.0.1`).
 

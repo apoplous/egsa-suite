@@ -1,4 +1,4 @@
-# Versions used for the v5.4.0-beta.1 audit/regression pass on 2026-09-01.
+# Versions used for the v5.4.0-beta.2 validation/regression pass on 2026-09-01.
 pyshp==2.3.1
 pyproj==3.7.2
 matplotlib==3.10.8

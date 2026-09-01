@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.4.0-beta.2 — 2026-09-01
+
+Small usability release following the first public beta.
+
+### Added
+- Users can set any HATT sheet as their personal default; the selection is stored outside the portable EXE in the per-user settings directory and restored automatically on the next launch.
+- DXF export now presents explicit options for separate vertex POINT entities and vertex-name TEXT labels. The base `EGSA_BOUNDARY` polyline is always exported; optional layers are off by default for a cleaner DXF.
+- Added regression tests for per-user settings persistence and DXF export options.
+
+### Changed
+- Updated application/build metadata to `v5.4.0-beta.2`.
+
 ## 5.4.0-beta.1 — 2026-09-01
 
 Public-release hardening of the v5.3 codebase.
