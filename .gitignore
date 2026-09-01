@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Build / packaging
+build/
+dist/
+release/
+*.spec.bak
+
+# Logs / temporary files
+*.log
+*.tmp
+*.temp
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local test/output artifacts
+coverage.xml
+htmlcov/
+.coverage

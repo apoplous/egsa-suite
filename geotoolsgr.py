@@ -1,0 +1,2666 @@
+"""
+EGSA Suite – Coordinate Transformation Suite
+Version 5.4.0-beta.1 - Public Release Candidate
+Author: D.T. 2026
+
+Μετατροπή συντεταγμένων από το τοπικό σύστημα HATT στο ΕΓΣΑ87
+με βάση πολυωνυμικό μετασχηματισμό 2ου βαθμού.
+"""
+
+# ── Splash screen ─────────────────────────────────────────────────────────────
+# Εμφανίζεται ΠΡΙΝ τα βαριά imports, ώστε ο χρήστης να βλέπει κάτι αμέσως.
+import tkinter as tk
+import sys, os
+from pathlib import Path
+
+def _show_splash() -> tk.Toplevel | None:
+    """Δημιουργεί και εμφανίζει το splash window EGSA Suite."""
+    try:
+        root_hidden = tk.Tk()
+        root_hidden.withdraw()
+
+        splash = tk.Toplevel(root_hidden)
+        splash.overrideredirect(True)
+        splash.configure(bg="#0f2d1a")
+
+        W, H = 580, 310
+        sw = splash.winfo_screenwidth()
+        sh = splash.winfo_screenheight()
+        splash.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
+
+        c = tk.Canvas(splash, width=W, height=H, bg="#0f2d1a",
+                      highlightthickness=0)
+        c.pack()
+
+        # ── Λεπτό border όλου του παραθύρου ──────────────────────
+        c.create_rectangle(1, 1, W-1, H-1, outline="#2a6e3f", width=1)
+
+        # ════════════════════════════════════════════════════════
+        # ΑΡΙΣΤΕΡΟ ΤΜΗΜΑ — Βουνό Ολύμπου + pin  (0..200)
+        # ════════════════════════════════════════════════════════
+        LW = 200   # πλάτος αριστερής ζώνης
+
+        # Ουρανός (πάνω μισό)
+        c.create_rectangle(0, 0, LW, H, fill="#0f2d1a", outline="")
+
+        # Βουνά — τρία επίπεδα για βάθος
+        # Πίσω βουνό (πιο ανοιχτό)
+        c.create_polygon(
+            20,175,  80,70,  140,175,
+            fill="#1e5530", outline=""
+        )
+        # Μεσαίο (κύριος Όλυμπος)
+        c.create_polygon(
+            0,175,  60,55,  120,175,
+            fill="#2a6e3f", outline=""
+        )
+        # Μπροστινό (σκοτεινότερο)
+        c.create_polygon(
+            70,175,  130,100,  190,175,
+            fill="#235e38", outline=""
+        )
+
+        # Χιόνι κορυφής (κύριος Όλυμπος)
+        c.create_polygon(
+            48,80,  60,55,  72,80,  67,77,  60,63,  53,77,
+            fill="#e8f5e9", outline=""
+        )
+        # Χιόνι μεσαίου
+        c.create_polygon(
+            122,112,  130,100,  138,112,  135,110,  130,103,  125,110,
+            fill="#c8e6c9", outline=""
+        )
+
+        # Έδαφος / πεδιάδα
+        c.create_rectangle(0, 175, LW, H, fill="#1a4a2e", outline="")
+        c.create_line(0, 175, LW, 175, fill="#2a6e3f", width=1)
+
+        # Pin (πάνω από την πεδιάδα, στο μέσο)
+        PX, PY = 100, 135   # κορυφή pin
+        # Σώμα pin (δάκρυ)
+        c.create_oval(PX-14, PY, PX+14, PY+28, fill="#e8f5e9", outline="#c8e6c9", width=1)
+        c.create_polygon(
+            PX-8, PY+22,  PX, PY+44,  PX+8, PY+22,
+            fill="#e8f5e9", outline=""
+        )
+        # Κέντρο pin
+        c.create_oval(PX-6, PY+6, PX+6, PY+18, fill="#2a6e3f", outline="")
+        c.create_oval(PX-2, PY+10, PX+2, PY+14, fill="#e8f5e9", outline="")
+        # Σκιά
+        c.create_oval(PX-10, 178, PX+10, 184, fill="#0f2d1a", outline="")
+
+        # Λεπτή κάθετη διαχωριστική γραμμή
+        c.create_line(LW, 20, LW, H-20, fill="#2a6e3f", width=1)
+
+        # ════════════════════════════════════════════════════════
+        # ΔΕΞΙ ΤΜΗΜΑ — Κείμενο  (210..W)
+        # ════════════════════════════════════════════════════════
+        TX = 218   # αρχή κειμένου
+
+        # ── Όνομα εφαρμογής — EGSA (μεγάλο) + Suite (μικρότερο, πράσινο) ──
+        c.create_text(TX, 48, text="EGSA",
+                      font=("Georgia", 32, "bold"),
+                      fill="#e8f5e9", anchor="w")
+        c.create_text(TX, 82, text="Suite",
+                      font=("Georgia", 26),
+                      fill="#2a6e3f", anchor="w")
+
+        # Οριζόντια γραμμή
+        c.create_rectangle(TX, 94, W-18, 96, fill="#2a6e3f", outline="")
+
+        # ── Tagline ──
+        c.create_text(TX, 112, text="COORDINATE TRANSFORMATION SUITE",
+                      font=("Segoe UI", 8),
+                      fill="#4a8a5f", anchor="w", )
+
+        # ── Pills: HATT → ΕΓΣΑ'87 → WGS84 ──
+        def pill(x, y, w, h, text, r=10):
+            c.create_rectangle(x, y, x+w, y+h, fill="#1a4a2e", outline="#2a6e3f", width=1)
+            c.create_text(x+w//2, y+h//2+1, text=text,
+                          font=("Courier New", 9, "bold"), fill="#8fbc8f")
+
+        def arrow_lbl(x, y):
+            c.create_text(x, y, text="→", font=("Segoe UI", 13),
+                          fill="#2a6e3f", anchor="w")
+
+        pill(TX,     126, 62, 22, "HATT")
+        arrow_lbl(TX+68, 137)
+        pill(TX+84,  126, 82, 22, "ΕΓΣΑ '87")
+        arrow_lbl(TX+172, 137)
+        pill(TX+188, 126, 72, 22, "WGS84")
+
+        # ── Google Earth badge ──
+        GE_X, GE_Y = TX, 160
+        c.create_rectangle(GE_X, GE_Y, GE_X+148, GE_Y+24,
+                           fill="#0f2d1a", outline="#2a6e3f", width=1)
+
+        # Mini GE globe (κύκλοι)
+        GX, GY = GE_X+14, GE_Y+12
+        c.create_oval(GX-8, GY-8, GX+8, GY+8, fill="#1a6e3f", outline="#4aae7f", width=1)
+        c.create_oval(GX-3, GY-3, GX+3, GY+3, fill="#4aae7f", outline="")
+        c.create_line(GX, GY-8, GX, GY+8, fill="#4aae7f", width=1)
+        c.create_line(GX-8, GY, GX+8, GY, fill="#4aae7f", width=1)
+
+        c.create_text(GE_X+30, GE_Y+12, text="Google Earth",
+                      font=("Segoe UI", 10), fill="#8fbc8f", anchor="w")
+
+        # KML live badge
+        KL_X = GE_X + 156
+        c.create_rectangle(KL_X, GE_Y, KL_X+64, GE_Y+24,
+                           fill="#0f2d1a", outline="#2a6e3f", width=1)
+        c.create_text(KL_X+32, GE_Y+12, text="KML live",
+                      font=("Courier New", 9), fill="#4a7a5f")
+
+        # ── Separator ──
+        c.create_line(TX, 196, W-18, 196, fill="#2a6e3f", width=1)
+
+        # ── Loading label ──
+        loading_var = tk.StringVar(value="Φόρτωση βιβλιοθηκών...")
+        loading_lbl = tk.Label(splash, textvariable=loading_var,
+                               bg="#0f2d1a", fg="#8fbc8f",
+                               font=("Segoe UI", 9))
+        loading_lbl.place(x=TX + (W - TX)//2 + TX//2, y=210, anchor="center")
+
+        # ── Progress bar ──
+        BAR_X, BAR_Y = TX, 226
+        BAR_W, BAR_H  = W - TX - 18, 7
+        c.create_rectangle(BAR_X, BAR_Y, BAR_X+BAR_W, BAR_Y+BAR_H,
+                           fill="#1a4a2e", outline="")
+        progress_bar = c.create_rectangle(BAR_X, BAR_Y, BAR_X, BAR_Y+BAR_H,
+                                          fill="#8fbc8f", outline="")
+
+        # ── Version ──
+        c.create_text(TX, 248, text="v5.4.0-beta.1  ·  390 εγγραφές HATT  ·  2026",
+                      font=("Segoe UI", 8), fill="#2a6e3f", anchor="w")
+
+        splash.update()
+
+        splash._canvas       = c
+        splash._progress_bar = progress_bar
+        splash._loading_var  = loading_var
+        splash._bar_x        = BAR_X
+        splash._bar_y        = BAR_Y
+        splash._bar_w        = BAR_W
+        splash._bar_h        = BAR_H
+        splash._root_hidden  = root_hidden
+
+        return splash
+    except Exception:
+        return None
+
+
+def _update_splash(splash, message: str, progress: float) -> None:
+    """Ενημερώνει το μήνυμα και την progress bar (progress: 0.0–1.0)."""
+    if splash is None:
+        return
+    try:
+        splash._loading_var.set(message)
+        x2 = splash._bar_x + int(splash._bar_w * min(progress, 1.0))
+        splash._canvas.coords(
+            splash._progress_bar,
+            splash._bar_x, splash._bar_y,
+            x2, splash._bar_y + splash._bar_h
+        )
+        splash.update()
+    except Exception:
+        pass
+
+
+def _close_splash(splash) -> None:
+    """Κλείνει το splash window."""
+    if splash is None:
+        return
+    try:
+        splash.destroy()
+        splash._root_hidden.destroy()
+    except Exception:
+        pass
+
+
+# Εμφάνιση splash ΑΜΕΣΩΣ
+_splash = None if os.environ.get("EGSA_SUITE_NO_SPLASH") == "1" else _show_splash()
+_update_splash(_splash, "Φόρτωση βιβλιοθηκών...", 0.05)
+# ─────────────────────────────────────────────────────────────────────────────
+
+from tkinter import filedialog, messagebox, ttk
+_update_splash(_splash, "Φόρτωση decimal, shapefile...", 0.15)
+from decimal import Decimal, getcontext, ROUND_HALF_UP, InvalidOperation
+import shapefile
+try:
+    import ezdxf
+    from ezdxf import units as dxf_units
+    DXF_AVAILABLE = True
+except ImportError:
+    DXF_AVAILABLE = False
+import string
+import re
+import codecs
+_update_splash(_splash, "Φόρτωση matplotlib...", 0.30)
+import matplotlib.pyplot as plt
+from matplotlib.ticker import ScalarFormatter
+import math
+_update_splash(_splash, "Φόρτωση folium...", 0.45)
+import folium
+import tempfile
+import webbrowser
+import atexit
+import logging
+import traceback
+from typing import List, Tuple, Optional
+from dataclasses import dataclass
+_update_splash(_splash, "Φόρτωση pyproj...", 0.60)
+from pyproj import Transformer, CRS
+import tempfile as _tempfile
+
+_update_splash(_splash, "Φόρτωση Google Earth modules...", 0.75)
+
+# ── PyInstaller path fix ──────────────────────────────────────────────────────
+if getattr(sys, 'frozen', False):
+    _BASE_DIR = Path(sys._MEIPASS)
+else:
+    _BASE_DIR = Path(__file__).resolve().parent
+
+if str(_BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(_BASE_DIR))
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Google Earth integration
+try:
+    from services.google_earth_service import GoogleEarthService
+    from utils.platform_utils import is_google_earth_installed
+    GE_AVAILABLE = True
+except ImportError:
+    GE_AVAILABLE = False
+
+_update_splash(_splash, "Αρχικοποίηση εφαρμογής...", 0.90)
+
+# Φάκελος εργασίας για GE (στο temp)
+_GE_WORK_DIR = Path(_tempfile.gettempdir()) / "egsa_suite_ge"
+
+# ==================== CONFIGURATION ====================
+
+getcontext().prec = 34
+APP_VERSION = "5.4.0-beta.1"
+DISPLAY_DEC = Decimal("0.01")
+
+# ── Χρωματική παλέτα ─────────────────────────────────────────────────────────
+C = {
+    "bg":          "#f7f8fa",
+    "green_dark":  "#1a4a2e",
+    "green_mid":   "#2a6e3f",
+    "green_light": "#eaf4ec",
+    "blue_btn":    "#1565c0",
+    "text":        "#1a1a1a",
+    "text_mid":    "#555555",
+    "text_dim":    "#999999",
+    "border":      "#d0d7de",
+    "output_bg":   "#f6f8fa",
+    "input_bg":    "#ffffff",
+    "white":       "#ffffff",
+    "header_fg":   "#e8f5e9",
+    "accent":      "#d4edda",
+}
+
+def setup_styles(root):
+    style = ttk.Style(root)
+    style.theme_use("clam")
+    style.configure("Modern.TCombobox",
+        fieldbackground=C["input_bg"], background=C["white"],
+        foreground=C["text"], bordercolor=C["border"],
+        arrowcolor=C["green_mid"], padding=(4, 3),
+    )
+    style.map("Modern.TCombobox",
+        fieldbackground=[("readonly", C["input_bg"])],
+        bordercolor=[("focus", C["green_mid"])],
+    )
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Φόρτωση συντελεστών HATT→ΕΓΣΑ87 για όλη την Ελλάδα (390 εγγραφές μετασχηματισμού)
+try:
+    from hatt_coefficients import HATT_COEFFICIENTS
+except ImportError:
+    HATT_COEFFICIENTS = {}
+
+# Προεπιλεγμένη περιοχή
+DEFAULT_REGION = "ΚΑΤΕΡΙΝΗ"
+
+# Η εγγραφή αυτή παρουσιάζει μεγάλη γεωγραφική ασυνέπεια στο διαθέσιμο dataset.
+# Δεν αλλάζουμε συντελεστές χωρίς πρωτογενή τεκμηρίωση· η UI εμφανίζει ρητή προειδοποίηση.
+UNVERIFIED_HATT_REGIONS = {
+    "ΝΗΣΟΣ ΜΕΓΙΣΤΗ(ΚΑΣΤΕΛΛΟΡΙΖΟ)": (
+        "Η συγκεκριμένη εγγραφή HATT παρουσιάζει σημαντική ασυνέπεια μεταξύ "
+        "του δηλωμένου κέντρου φύλλου και των σταθερών συντελεστών μετασχηματισμού. "
+        "Μην χρησιμοποιήσεις το αποτέλεσμα σε επαγγελματική/διοικητική εργασία χωρίς "
+        "ανεξάρτητη επαλήθευση από επίσημη γεωδαιτική πηγή."
+    )
+}
+
+def _region_to_decimal_coeffs(region_name: str) -> dict:
+    """Μετατρέπει τους float συντελεστές μιας περιοχής σε Decimal."""
+    d = HATT_COEFFICIENTS.get(region_name)
+    if d is None:
+        raise KeyError(f"Άγνωστη περιοχή: {region_name}")
+    A, B = d['A'], d['B']
+    return {
+        'X': {
+            'constant': Decimal(str(A[0])),
+            'x':        Decimal(str(A[1])),
+            'y':        Decimal(str(A[2])),
+            'x2':       Decimal(str(A[3])),
+            'y2':       Decimal(str(A[4])),
+            'xy':       Decimal(str(A[5])),
+        },
+        'Y': {
+            'constant': Decimal(str(B[0])),
+            'x':        Decimal(str(B[1])),
+            'y':        Decimal(str(B[2])),
+            'x2':       Decimal(str(B[3])),
+            'y2':       Decimal(str(B[4])),
+            'xy':       Decimal(str(B[5])),
+        }
+    }
+
+# Συντελεστές μετασχηματισμού HATT → EGSA87 (Πιερία / Κατερίνη — προεπιλογή)
+TRANSFORM_COEFFICIENTS = _region_to_decimal_coeffs(DEFAULT_REGION) if HATT_COEFFICIENTS else {
+    'X': {
+        'constant': Decimal("369585.94"),
+        'x':  Decimal("0.9996775"),  'y':  Decimal("0.0173122"),
+        'x2': Decimal("-1.04E-9"),   'y2': Decimal("1.81E-9"),
+        'xy': Decimal("-3.60E-10")
+    },
+    'Y': {
+        'constant': Decimal("4456429.27"),
+        'x':  Decimal("-0.0173071"), 'y':  Decimal("0.9996669"),
+        'x2': Decimal("1.00E-10"),   'y2': Decimal("2.30E-10"),
+        'xy': Decimal("-3.03E-9")
+    }
+}
+
+# Μηνύματα
+MESSAGES = {
+    'error_min_points': 'Απαιτούνται τουλάχιστον 3 σημεία.',
+    'error_title': 'Λάθος',
+    'success_export': 'Το πολύγωνο αποθηκεύτηκε σε EGSA87.',
+    'success_title': 'OK'
+}
+
+# Logging setup
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Temporary files cleanup
+temp_files = []
+
+def cleanup_temp_files():
+    """Διαγραφή προσωρινών αρχείων κατά το κλείσιμο."""
+    for f in temp_files:
+        try:
+            if os.path.exists(f):
+                os.unlink(f)
+                logger.info(f"Deleted temp file: {f}")
+        except Exception as e:
+            logger.warning(f"Failed to delete {f}: {e}")
+
+atexit.register(cleanup_temp_files)
+
+# ==================== DATA STRUCTURES ====================
+
+@dataclass
+class Point:
+    """Αναπαράσταση ενός σημείου με όνομα και συντεταγμένες."""
+    name: str
+    x: Decimal
+    y: Decimal
+    
+    def to_float_tuple(self) -> Tuple[float, float]:
+        """Μετατροπή σε float tuple για plotting."""
+        return (float(self.x), float(self.y))
+
+# ==================== CORE LOGIC CLASSES ====================
+
+class CoordinateTransformer:
+    """Χειρισμός μετατροπών συντεταγμένων."""
+
+    def __init__(self):
+        self.egsa_to_wgs = Transformer.from_crs("EPSG:2100", "EPSG:4326", always_xy=True)
+        self._coeffs = TRANSFORM_COEFFICIENTS  # τρέχοντες συντελεστές
+
+    def set_region(self, region_name: str) -> None:
+        """Αλλαγή περιοχής HATT — φορτώνει τους αντίστοιχους συντελεστές."""
+        self._coeffs = _region_to_decimal_coeffs(region_name)
+        logger.info(f"Region set to: {region_name}")
+
+    def HATT_to_egsa(self, x: Decimal, y: Decimal) -> Tuple[Decimal, Decimal]:
+        """
+        Μετατροπή από HATT σε EGSA87 με πολυωνυμικό μετασχηματισμό 2ου βαθμού.
+        Χρησιμοποιεί τους συντελεστές της τρέχουσας περιοχής.
+        """
+        c = self._coeffs
+
+        X = (c['X']['constant'] +
+             c['X']['x']  * x +
+             c['X']['y']  * y +
+             c['X']['x2'] * x * x +
+             c['X']['y2'] * y * y +
+             c['X']['xy'] * x * y)
+
+        Y = (c['Y']['constant'] +
+             c['Y']['x']  * x +
+             c['Y']['y']  * y +
+             c['Y']['x2'] * x * x +
+             c['Y']['y2'] * y * y +
+             c['Y']['xy'] * x * y)
+
+        return X, Y
+
+    def egsa_to_wgs84(self, x: Decimal, y: Decimal) -> Tuple[float, float]:
+        """Μετατροπή από EGSA87 σε WGS84 (για χάρτες)."""
+        lon, lat = self.egsa_to_wgs.transform(float(x), float(y))
+        return lon, lat
+
+
+class PolygonCalculator:
+    """Υπολογισμοί γεωμετρίας πολυγώνων."""
+    
+    @staticmethod
+    def calculate_area(points: List[Point]) -> Decimal:
+        """
+        Υπολογισμός εμβαδού πολυγώνου με τον τύπο Shoelace.
+        
+        Args:
+            points: Λίστα σημείων του πολυγώνου
+            
+        Returns:
+            Εμβαδόν σε τετραγωνικά μέτρα
+        """
+        if len(points) < 3:
+            return Decimal("0")
+        
+        # Κλείσιμο πολυγώνου
+        closed_points = points + [points[0]]
+        
+        area = Decimal("0")
+        for i in range(len(closed_points) - 1):
+            x1, y1 = closed_points[i].x, closed_points[i].y
+            x2, y2 = closed_points[i + 1].x, closed_points[i + 1].y
+            area += x1 * y2 - x2 * y1
+        
+        return abs(area) / 2
+    
+    @staticmethod
+    def calculate_distance(p1: Point, p2: Point) -> Decimal:
+        """Υπολογισμός Ευκλείδειας απόστασης μεταξύ δύο σημείων."""
+        dx = float(p2.x - p1.x)
+        dy = float(p2.y - p1.y)
+        return Decimal(str(math.sqrt(dx * dx + dy * dy)))
+
+    @staticmethod
+    def _orientation(a: Point, b: Point, c: Point) -> Decimal:
+        """Προσανατολισμός τριάδας σημείων (θετικό/αρνητικό/μηδέν)."""
+        return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+
+    @staticmethod
+    def _on_segment(a: Point, b: Point, c: Point) -> bool:
+        """True όταν το c βρίσκεται πάνω στο κλειστό τμήμα a-b."""
+        return (min(a.x, b.x) <= c.x <= max(a.x, b.x) and
+                min(a.y, b.y) <= c.y <= max(a.y, b.y))
+
+    @classmethod
+    def _segments_intersect(cls, a: Point, b: Point, c: Point, d: Point) -> bool:
+        o1 = cls._orientation(a, b, c)
+        o2 = cls._orientation(a, b, d)
+        o3 = cls._orientation(c, d, a)
+        o4 = cls._orientation(c, d, b)
+
+        if ((o1 > 0 and o2 < 0) or (o1 < 0 and o2 > 0)) and \
+           ((o3 > 0 and o4 < 0) or (o3 < 0 and o4 > 0)):
+            return True
+        if o1 == 0 and cls._on_segment(a, b, c): return True
+        if o2 == 0 and cls._on_segment(a, b, d): return True
+        if o3 == 0 and cls._on_segment(c, d, a): return True
+        if o4 == 0 and cls._on_segment(c, d, b): return True
+        return False
+
+    @classmethod
+    def self_intersection_pairs(cls, points: List[Point]) -> List[Tuple[int, int]]:
+        """
+        Επιστρέφει ζεύγη ακμών που τέμνονται σε κλειστό πολύγωνο.
+        Οι γειτονικές ακμές εξαιρούνται, επειδή μοιράζονται νόμιμα μία κορυφή.
+        """
+        n = len(points)
+        if n < 4:
+            return []
+        intersections = []
+        for i in range(n):
+            a, b = points[i], points[(i + 1) % n]
+            for j in range(i + 1, n):
+                if j == i or j == (i + 1) % n or i == (j + 1) % n:
+                    continue
+                # πρώτη και τελευταία ακμή είναι επίσης γειτονικές
+                if i == 0 and j == n - 1:
+                    continue
+                c, d = points[j], points[(j + 1) % n]
+                if cls._segments_intersect(a, b, c, d):
+                    intersections.append((i, j))
+        return intersections
+
+    @classmethod
+    def has_self_intersections(cls, points: List[Point]) -> bool:
+        return bool(cls.self_intersection_pairs(points))
+
+
+class InputParser:
+    """Ανάλυση εισόδου χρήστη."""
+    
+    @staticmethod
+    def parse_decimal(s: str) -> Decimal:
+        """
+        Μετατροπή string σε Decimal με υποστήριξη διαφόρων μορφών.
+        
+        Args:
+            s: String προς μετατροπή
+            
+        Returns:
+            Decimal αριθμός
+            
+        Raises:
+            InvalidOperation: Αν το string δεν είναι έγκυρος αριθμός
+        """
+        s = s.strip()
+        
+        # Χειρισμός μικτής χρήσης . και ,
+        if ',' in s and '.' in s:
+            if s.rfind(',') > s.rfind('.'):
+                s = s.replace('.', '').replace(',', '.')
+            else:
+                s = s.replace(',', '')
+        else:
+            s = s.replace(',', '.')
+        
+        return Decimal(s)
+    
+    @staticmethod
+    def smart_split(line: str) -> List[str]:
+        """
+        Έξυπνο split με δοκιμή διαφόρων διαχωριστών.
+        
+        Args:
+            line: Γραμμή προς ανάλυση
+            
+        Returns:
+            Λίστα με τα μέρη της γραμμής
+        """
+        for delim in ["\t", ";", " ", ","]:
+            if delim in line:
+                parts = [p for p in line.split(delim) if p.strip()]
+                if len(parts) >= 2:
+                    return parts
+        return line.split()
+    
+    @staticmethod
+    def parse_points(text: str, auto_names: bool = True) -> Tuple[List[Point], List[str]]:
+        """
+        Ανάλυση κειμένου σε λίστα σημείων.
+        
+        Args:
+            text: Κείμενο με σημεία (μία γραμμή ανά σημείο)
+            auto_names: Αν True, δημιουργεί αυτόματα ονόματα (A, B, C...)
+            
+        Returns:
+            Tuple με (λίστα Points, λίστα errors)
+        """
+        lines = text.splitlines()
+        points = []
+        errors = []
+        auto_letters = list(string.ascii_uppercase)
+        auto_index = 0
+        
+        for line_num, line in enumerate(lines, 1):
+            parts = InputParser.smart_split(line)
+            if not parts:
+                continue
+            
+            try:
+                # Προσδιορισμός ονόματος και συντεταγμένων
+                if len(parts) >= 3:
+                    name, x_str, y_str = parts[0], parts[1], parts[2]
+                elif len(parts) == 2:
+                    x_str, y_str = parts[0], parts[1]
+                    if auto_names:
+                        name = (auto_letters[auto_index] 
+                               if auto_index < len(auto_letters) 
+                               else f"A{auto_index}")
+                        auto_index += 1
+                    else:
+                        name = f"P{line_num}"
+                else:
+                    errors.append(f"Γραμμή {line_num}: Ανεπαρκή δεδομένα")
+                    continue
+                
+                # Μετατροπή συντεταγμένων
+                x = InputParser.parse_decimal(x_str)
+                y = InputParser.parse_decimal(y_str)
+                
+                points.append(Point(name=name, x=x, y=y))
+                
+            except (ValueError, InvalidOperation) as e:
+                errors.append(f"Γραμμή {line_num}: Μη έγκυρες συντεταγμένες ({e})")
+                logger.warning(f"Parse error at line {line_num}: {e}")
+                continue
+        
+        return points, errors
+
+
+class ShapefileExporter:
+    """Ασφαλής εξαγωγή POINT / POLYLINE / POLYGON σε ΕΓΣΑ87 (EPSG:2100)."""
+
+    PRJ_EPSG_2100 = (
+        'PROJCS["GGRS87 / Greek Grid",GEOGCS["GGRS87",'
+        'DATUM["Greek_Geodetic_Reference_System-1987",'
+        'SPHEROID["GRS_1980",6378137,298.257222101]],'
+        'PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]],'
+        'PROJECTION["Transverse_Mercator"],'
+        'PARAMETER["latitude_of_origin",0],'
+        'PARAMETER["central_meridian",24],'
+        'PARAMETER["scale_factor",0.9996],'
+        'PARAMETER["false_easting",500000],'
+        'PARAMETER["false_northing",0],UNIT["metre",1]]'
+    )
+
+    @staticmethod
+    def _validate(points: List[Point]) -> None:
+        if not points:
+            raise ValueError("Δεν υπάρχουν σημεία για εξαγωγή.")
+        coords = [(float(p.x), float(p.y)) for p in points]
+        if len(set(coords)) != len(coords):
+            raise ValueError("Υπάρχουν διπλότυπες κορυφές. Αφαιρέστε τις πριν την εξαγωγή.")
+        for x, y in coords:
+            if not (100000 <= x <= 900000 and 3800000 <= y <= 4700000):
+                raise ValueError(f"Η συντεταγμένη ({x:.3f}, {y:.3f}) είναι εκτός αναμενόμενων ορίων ΕΓΣΑ87 Ελλάδας.")
+        if len(points) >= 3 and PolygonCalculator.has_self_intersections(points):
+            raise ValueError(
+                "Το πολύγωνο παρουσιάζει αυτοτομή. Ελέγξτε τη σειρά των κορυφών πριν την εξαγωγή."
+            )
+
+    @classmethod
+    def export_geometry(cls, points: List[Point], filepath: str) -> str:
+        cls._validate(points)
+        coords = [(float(p.x), float(p.y)) for p in points]
+        n = len(coords)
+
+        if n == 1:
+            geometry_name = "POINT"
+            w = shapefile.Writer(filepath, shapefile.POINT, encoding="utf-8")
+        elif n == 2:
+            geometry_name = "POLYLINE"
+            w = shapefile.Writer(filepath, shapefile.POLYLINE, encoding="utf-8")
+        else:
+            area = PolygonCalculator.calculate_area(points)
+            if area == 0:
+                raise ValueError("Το πολύγωνο έχει μηδενικό εμβαδόν.")
+            geometry_name = "POLYGON"
+            w = shapefile.Writer(filepath, shapefile.POLYGON, encoding="utf-8")
+
+        try:
+            w.field("ID", "N", decimal=0)
+            w.field("NAME", "C", size=80)
+            if n == 1:
+                w.point(*coords[0]); w.record(1, points[0].name)
+            elif n == 2:
+                w.line([coords]); w.record(1, "Γραμμή ΕΓΣΑ87")
+            else:
+                ring = coords + [coords[0]]
+                w.poly([ring]); w.record(1, "Πολύγωνο ΕΓΣΑ87")
+        finally:
+            w.close()
+
+        base = str(Path(filepath).with_suffix(""))
+        Path(base + ".prj").write_text(cls.PRJ_EPSG_2100, encoding="utf-8")
+        Path(base + ".cpg").write_text("UTF-8", encoding="utf-8")
+        logger.info("Shapefile %s exported: %s", geometry_name, filepath)
+        return geometry_name
+
+
+def is_epsg2100_prj(prj_text: str) -> bool:
+    """Αναγνώριση .prj ως GGRS87 / Greek Grid (EPSG:2100) μέσω pyproj."""
+    try:
+        source = CRS.from_wkt(prj_text)
+    except Exception:
+        try:
+            source = CRS.from_user_input(prj_text)
+        except Exception:
+            return False
+    target = CRS.from_epsg(2100)
+    try:
+        epsg = source.to_epsg(min_confidence=70)
+    except TypeError:
+        epsg = source.to_epsg()
+    if epsg == 2100:
+        return True
+    try:
+        return source.equals(target, ignore_axis_order=True)
+    except TypeError:
+        return source.equals(target)
+
+
+def format_hatt_angle(value) -> str:
+    """
+    Τα phi0/lam0 του dataset είναι κωδικοποιημένα ως μοίρες.λεπτά
+    (π.χ. 40.15 = 40°15′), όχι ως δεκαδικές μοίρες.
+    """
+    if value is None:
+        return "—"
+    sign = "−" if float(value) < 0 else ""
+    v = abs(float(value))
+    degrees = int(v)
+    minutes = int(round((v - degrees) * 100))
+    if minutes >= 60:
+        degrees += minutes // 60
+        minutes %= 60
+    return f"{sign}{degrees}°{minutes:02d}′"
+
+
+def safe_point_name(value, fallback: str = "P") -> str:
+    """Μετατρέπει external labels σε ένα token συμβατό με το input format της εφαρμογής."""
+    text = str(value or "").strip()
+    if not text:
+        return fallback
+    text = re.sub(r"[\s,;]+", "_", text)
+    return text.strip("_") or fallback
+
+
+def shapefile_text_encoding(shp_path: str) -> str:
+    """Διαβάζει το .cpg όταν υπάρχει και επιστρέφει Python codec για το DBF."""
+    cpg = Path(shp_path).with_suffix(".cpg")
+    if not cpg.exists():
+        return "utf-8"
+    raw = cpg.read_text(encoding="ascii", errors="ignore").strip().strip('"').strip("'")
+    key = re.sub(r"[^A-Z0-9]", "", raw.upper())
+    aliases = {
+        "UTF8": "utf-8",
+        "65001": "utf-8",
+        "1253": "cp1253",
+        "CP1253": "cp1253",
+        "WINDOWS1253": "cp1253",
+        "ISO88597": "iso8859_7",
+        "ISOIR126": "iso8859_7",
+    }
+    candidate = aliases.get(key, raw or "utf-8")
+    try:
+        codecs.lookup(candidate)
+        return candidate
+    except LookupError:
+        logger.warning("Unknown Shapefile CPG encoding %r; falling back to UTF-8", raw)
+        return "utf-8"
+
+
+def extract_shapefile_candidates(reader) -> list:
+    """
+    Μετατρέπει κάθε feature/part ενός pyshp Reader σε ανεξάρτητο candidate.
+    Έτσι multipart και multi-feature δεδομένα δεν συγχωνεύονται σιωπηρά.
+    """
+    field_names = [f[0].upper() for f in reader.fields[1:]]
+    name_field = next(
+        (i for i, f in enumerate(field_names)
+         if f in ('NAME', 'ONOMA', 'LABEL', 'ID', 'DESCR', 'ΠΕΡΙΓΡΑΦΗ')),
+        None
+    )
+    point_types = {1, 11, 21}
+    polyline_types = {3, 13, 23}
+    polygon_types = {5, 15, 25}
+    candidates = []
+
+    for feature_idx, sr in enumerate(reader.shapeRecords(), 1):
+        geom = sr.shape
+        rec = sr.record
+        raw = rec[name_field] if name_field is not None else None
+        feature_name = str(raw).strip() if raw not in (None, "") else f"Feature {feature_idx}"
+        st = geom.shapeType
+
+        if st in point_types:
+            if geom.points:
+                candidates.append({
+                    "geometry_type": "POINT",
+                    "feature_index": feature_idx,
+                    "part_index": 1,
+                    "feature_name": feature_name,
+                    "points": [geom.points[0]],
+                    "closed": False,
+                })
+            continue
+
+        if st not in polyline_types and st not in polygon_types:
+            continue
+
+        starts = list(geom.parts) or [0]
+        ends = starts[1:] + [len(geom.points)]
+        for part_idx, (part_start, part_end) in enumerate(zip(starts, ends), 1):
+            pts = list(geom.points[part_start:part_end])
+            closed = st in polygon_types
+            if len(pts) > 1 and pts[0] == pts[-1]:
+                pts = pts[:-1]
+                closed = True
+            if pts:
+                candidates.append({
+                    "geometry_type": "POLYGON" if st in polygon_types else "POLYLINE",
+                    "feature_index": feature_idx,
+                    "part_index": part_idx,
+                    "feature_name": feature_name,
+                    "points": pts,
+                    "closed": closed,
+                })
+    return candidates
+
+
+# ==================== UTILITY FUNCTIONS ====================
+
+def format_display(d: Decimal) -> str:
+    """
+    Μορφοποίηση Decimal για εμφάνιση με ελληνικό κόμμα.
+    
+    Args:
+        d: Decimal αριθμός
+        
+    Returns:
+        Formatted string
+    """
+    return f"{d.quantize(DISPLAY_DEC, rounding=ROUND_HALF_UP):f}".replace(".", ",")
+
+
+def add_context_menu(widget: tk.Text):
+    """
+    Προσθήκη context menu (δεξί click) σε Text widget.
+    
+    Args:
+        widget: Το Text widget
+    """
+    menu = tk.Menu(widget, tearoff=0)
+    menu.add_command(label="Copy", command=lambda: widget.event_generate("<<Copy>>"))
+    menu.add_command(label="Paste", command=lambda: widget.event_generate("<<Paste>>"))
+    menu.add_separator()
+    menu.add_command(label="Select All", 
+                    command=lambda: widget.tag_add("sel", "1.0", "end"))
+    
+    def popup(event):
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+    
+    widget.bind("<Button-3>", popup)
+    
+    # Keyboard shortcuts
+    def key_handler(event):
+        if not (event.state & 0x4):  # Ctrl key
+            return None
+        if event.keycode == 86:  # V
+            widget.event_generate("<<Paste>>")
+            return "break"
+        if event.keycode == 67:  # C
+            widget.event_generate("<<Copy>>")
+            return "break"
+        if event.keycode == 65:  # A
+            widget.tag_add("sel", "1.0", "end")
+            return "break"
+        return None
+    
+    widget.bind("<KeyPress>", key_handler)
+
+
+# ==================== MAIN APPLICATION ====================
+
+class HATTEgsaApp:
+    """Κύρια εφαρμογή GUI."""
+    
+    def __init__(self, root: tk.Tk):
+        self.root = root
+        self.root.title("EGSA Suite")
+        self.root.configure(bg=C["bg"])
+        setup_styles(root)
+        
+        # Core components
+        self.transformer = CoordinateTransformer()
+        self.calculator = PolygonCalculator()
+        self.parser = InputParser()
+        self.exporter = ShapefileExporter()
+        
+        # Data storage
+        self.HATT_points: List[Point] = []
+        self.egsa_points: List[Point] = []
+        
+        # UI Variables — δεσμεύονται ρητά στο σωστό root
+        self.mode_var = tk.StringVar(master=root, value="HATT")
+        self.map_style_var = tk.StringVar(master=root, value="ESRI Satellite")
+
+        # Camera tracking vars — αρχικοποίηση εδώ ώστε να υπάρχουν πάντα
+        self._ge_cam_x_var   = tk.StringVar(master=root, value="—")
+        self._ge_cam_y_var   = tk.StringVar(master=root, value="—")
+        self._ge_cam_lon_var = tk.StringVar(master=root, value="—")
+        self._ge_cam_lat_var = tk.StringVar(master=root, value="—")
+        
+        # Google Earth Service
+        self.ge_service: Optional[GoogleEarthService] = None
+        self.ge_window: Optional[tk.Toplevel] = None
+        if GE_AVAILABLE:
+            try:
+                self.ge_service = GoogleEarthService(_GE_WORK_DIR)
+                self.ge_service.initialize()
+                self.ge_service.set_camera_callback(self._on_ge_camera_update)
+                logger.info("GoogleEarthService initialized")
+            except Exception as e:
+                logger.warning(f"GE service failed to start: {e}")
+                self.ge_service = None
+
+        # Shutdown GE service on app close
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        # Build UI
+        self._create_ui()
+
+        logger.info("Application initialized")
+    
+    def _create_ui(self):
+        """Δημιουργία UI components."""
+        # Top frame με buttons
+        self._create_top_frame()
+        
+        # Mode selection
+        self._create_mode_selection()
+        
+        # HATT frame
+        self.frame_HATT = self._create_HATT_frame()
+        
+        # EGSA frame
+        self.frame_egsa = self._create_egsa_frame()
+        
+        # Footer
+        self._create_footer()
+        
+        # Initialize view
+        self._switch_mode()
+        self.mode_var.trace_add("write", lambda *args: self._switch_mode())
+    
+    def _create_top_frame(self):
+        """Δημιουργία top frame."""
+        top = tk.Frame(self.root, bg=C["green_dark"])
+        top.pack(fill="x")
+
+        # Λογότυπο
+        tk.Label(top, text="EGSA",
+                 font=("Segoe UI", 14, "bold"),
+                 bg=C["green_dark"], fg=C["header_fg"]).pack(side="left", padx=(14,0), pady=8)
+        tk.Label(top, text=" Suite",
+                 font=("Segoe UI", 14),
+                 bg=C["green_dark"], fg=C["green_mid"]).pack(side="left", pady=8)
+
+        # Always-on-top
+        self.always_on_top_var = tk.BooleanVar(master=self.root, value=False)
+        tk.Checkbutton(
+            top, text="📌",
+            variable=self.always_on_top_var,
+            command=self._toggle_always_on_top,
+            bg=C["green_dark"], fg=C["header_fg"],
+            selectcolor=C["green_dark"],
+            activebackground=C["green_dark"], activeforeground=C["header_fg"],
+            font=("Segoe UI", 10), bd=0, relief="flat"
+        ).pack(side="left", padx=8)
+
+        # Right buttons — flat, λεπτά
+        for txt, cmd in [("Οδηγίες", self._show_help), ("About", self._show_about)]:
+            tk.Button(top, text=txt, command=cmd,
+                      relief="flat", bd=0,
+                      bg=C["green_mid"], fg=C["white"],
+                      activebackground="#3a8e5f", activeforeground=C["white"],
+                      font=("Segoe UI", 9), padx=12, pady=6,
+                      cursor="hand2"
+                      ).pack(side="right", padx=(0,6), pady=6)
+
+    def _toggle_always_on_top(self):
+        """Ενεργοποίηση/απενεργοποίηση 'Πάντα στην κορυφή' για το κύριο παράθυρο."""
+        self.root.attributes("-topmost", self.always_on_top_var.get())
+
+    def _create_mode_selection(self):
+        """Επιλογή λειτουργίας."""
+        outer = tk.Frame(self.root, bg=C["bg"])
+        outer.pack(fill="x", padx=12, pady=(10, 4))
+
+        tk.Label(outer, text="ΛΕΙΤΟΥΡΓΙΑ",
+                 font=("Segoe UI", 7, "bold"), fg=C["text_dim"],
+                 bg=C["bg"]).pack(anchor="w")
+
+        radio_row = tk.Frame(outer, bg=C["bg"])
+        radio_row.pack(anchor="w", pady=(2, 0))
+
+        for txt, val in [("Μετατροπή HATT → ΕΓΣΑ87", "HATT"),
+                         ("Δημιουργία πολυγώνου ΕΓΣΑ87", "egsa")]:
+            tk.Radiobutton(
+                radio_row, text=txt,
+                variable=self.mode_var, value=val,
+                font=("Segoe UI", 9), bg=C["bg"],
+                fg=C["text"], selectcolor=C["bg"],
+                activebackground=C["bg"],
+                cursor="hand2"
+            ).pack(side="left", padx=(0, 20))
+
+        # Λεπτή γραμμή separator
+        sep = tk.Frame(self.root, bg=C["border"], height=1)
+        sep.pack(fill="x", padx=12, pady=(6, 0))
+    
+    def _create_HATT_frame(self) -> tk.Frame:
+        """Δημιουργία HATT mode frame."""
+        frame = tk.Frame(self.root, bg=C["bg"])
+
+        PAD = {"padx": 12}
+
+        # ── Περιοχή HATT ─────────────────────────────────────────────────────
+        region_outer = tk.Frame(frame, bg=C["bg"])
+        region_outer.pack(fill="x", pady=(10, 4), **PAD)
+
+        tk.Label(region_outer, text="ΦΥΛΛΟ ΧΑΡΤΗ HATT",
+                 font=("Segoe UI", 7, "bold"), fg=C["text_dim"],
+                 bg=C["bg"]).pack(anchor="w")
+
+        region_row = tk.Frame(region_outer, bg=C["bg"])
+        region_row.pack(fill="x", pady=(3, 0))
+
+        # Στο dropdown εμφανίζεται μαζί ο αριθμός φύλλου και η περιοχή,
+        # ενώ εσωτερικά διατηρούμε το πραγματικό όνομα-κλειδί του πίνακα.
+        if HATT_COEFFICIENTS:
+            self._region_display_to_name = {
+                f"Φ. {HATT_COEFFICIENTS[name]['code']} — {name}": name
+                for name in sorted(HATT_COEFFICIENTS.keys())
+            }
+        else:
+            self._region_display_to_name = {DEFAULT_REGION: DEFAULT_REGION}
+
+        self._region_name_to_display = {
+            name: display for display, name in self._region_display_to_name.items()
+        }
+        default_display = self._region_name_to_display.get(DEFAULT_REGION, DEFAULT_REGION)
+
+        self.region_var = tk.StringVar(master=self.root, value=default_display)
+        self.region_combo = ttk.Combobox(
+            region_row, textvariable=self.region_var,
+            values=list(self._region_display_to_name.keys()),
+            width=38, state="readonly",
+            style="Modern.TCombobox"
+        )
+        self.region_combo.set(default_display)
+        self.region_combo.pack(side="left", fill="x", expand=True)
+        self.region_combo.bind("<<ComboboxSelected>>", self._on_region_changed)
+
+        self.region_code_lbl = tk.Label(
+            region_row,
+            text=self._region_info_text(DEFAULT_REGION),
+            font=("Segoe UI", 8), fg=C["text_dim"], bg=C["bg"]
+        )
+        self.region_code_lbl.pack(side="left", padx=(10, 0))
+
+        # ── Separator ─────────────────────────────────────────────────────────
+        tk.Frame(frame, bg=C["border"], height=1).pack(fill="x", padx=12, pady=(6, 0))
+
+        # ── Input ─────────────────────────────────────────────────────────────
+        inp_outer = tk.Frame(frame, bg=C["bg"])
+        inp_outer.pack(fill="x", pady=(10, 4), **PAD)
+
+        hdr = tk.Frame(inp_outer, bg=C["bg"])
+        hdr.pack(fill="x")
+        tk.Label(hdr, text="Σημεία εισόδου  ",
+                 font=("Segoe UI", 9, "bold"), fg=C["text"],
+                 bg=C["bg"]).pack(side="left")
+        tk.Label(hdr, text="(Όνομα X Y)  ή  (X Y)  —  μία γραμμή ανά σημείο",
+                 font=("Segoe UI", 8), fg=C["text_dim"],
+                 bg=C["bg"]).pack(side="left")
+
+        self.HATT_input = tk.Text(
+            frame, width=48, height=6,
+            font=("Consolas", 9),
+            bg=C["input_bg"], fg=C["text"],
+            relief="flat", bd=0,
+            insertbackground=C["green_mid"],
+            selectbackground=C["accent"],
+            highlightthickness=1,
+            highlightbackground=C["border"],
+            highlightcolor=C["green_mid"],
+            padx=8, pady=6
+        )
+        self.HATT_input.pack(fill="x", padx=12)
+        add_context_menu(self.HATT_input)
+
+        # Paste / Clear
+        btn_row = tk.Frame(frame, bg=C["bg"])
+        btn_row.pack(pady=(5, 0), **PAD)
+        for txt, cmd in [
+            ("📋  Επικόλληση", lambda: self._paste_to(self.HATT_input)),
+            ("✕  Καθαρισμός", lambda: self.HATT_input.delete("1.0", tk.END)),
+        ]:
+            tk.Button(btn_row, text=txt, command=cmd,
+                      font=("Segoe UI", 8), relief="flat", bd=0,
+                      bg=C["bg"], fg=C["text_mid"],
+                      activebackground=C["border"],
+                      padx=10, pady=4, cursor="hand2"
+                      ).pack(side="left", padx=(0, 6))
+
+        # ── Calculate button ──────────────────────────────────────────────────
+        tk.Frame(frame, bg=C["border"], height=1).pack(fill="x", padx=12, pady=(8, 0))
+
+        calc_frame = tk.Frame(frame, bg=C["bg"])
+        calc_frame.pack(fill="x", padx=12, pady=8)
+        tk.Button(
+            calc_frame, text="  ➜   Μετατροπή σε ΕΓΣΑ87  ",
+            command=self._calculate_HATT,
+            font=("Segoe UI", 10, "bold"),
+            fg=C["white"], bg=C["blue_btn"],
+            activebackground="#1976d2", activeforeground=C["white"],
+            relief="flat", bd=0, pady=8, cursor="hand2"
+        ).pack(fill="x")
+
+        # ── Output ───────────────────────────────────────────────────────────
+        out_hdr = tk.Frame(frame, bg=C["bg"])
+        out_hdr.pack(fill="x", pady=(4, 2), **PAD)
+        tk.Label(out_hdr, text="Αποτελέσματα σε ΕΓΣΑ87",
+                 font=("Segoe UI", 9, "bold"), fg=C["text"],
+                 bg=C["bg"]).pack(side="left")
+        tk.Button(out_hdr, text="📄 Αντιγραφή",
+                  font=("Segoe UI", 8), relief="flat", bd=0,
+                  bg=C["bg"], fg=C["text_dim"],
+                  activebackground=C["border"],
+                  padx=8, pady=2, cursor="hand2",
+                  command=lambda: self._copy_text_to_clipboard(self.HATT_output)
+                  ).pack(side="right")
+
+        self.HATT_output = tk.Text(
+            frame, width=48, height=8,
+            font=("Consolas", 9),
+            bg=C["output_bg"], fg=C["text"],
+            state="disabled", relief="flat", bd=0,
+            highlightthickness=1,
+            highlightbackground=C["border"],
+            highlightcolor=C["border"],
+            padx=8, pady=6
+        )
+        self.HATT_output.pack(fill="x", padx=12)
+        add_context_menu(self.HATT_output)
+
+        # Area labels
+        self.lbl_HATT_area = tk.Label(frame, fg=C["green_mid"], bg=C["bg"],
+                                       font=("Segoe UI", 8))
+        self.lbl_egsa_area = tk.Label(frame, fg=C["green_mid"], bg=C["bg"],
+                                       font=("Segoe UI", 8))
+        self.lbl_diff      = tk.Label(frame, fg=C["text_mid"],  bg=C["bg"],
+                                       font=("Segoe UI", 8))
+
+        # ── Google Earth ──────────────────────────────────────────────────────
+        if GE_AVAILABLE:
+            ge_frame = tk.Frame(frame, bg=C["bg"])
+            ge_frame.pack(fill="x", padx=12, pady=(10, 0))
+            tk.Button(
+                ge_frame, text="🌍  Άνοιγμα στο Google Earth",
+                command=self._open_google_earth_window,
+                font=("Segoe UI", 9, "bold"),
+                fg=C["white"], bg=C["green_mid"],
+                activebackground="#3a8e5f", activeforeground=C["white"],
+                relief="flat", bd=0, pady=7, cursor="hand2"
+            ).pack(fill="x")
+
+        # ── Actions ───────────────────────────────────────────────────────────
+        tk.Frame(frame, bg=C["border"], height=1).pack(fill="x", padx=12, pady=(12, 0))
+
+        act_outer = tk.Frame(frame, bg=C["bg"])
+        act_outer.pack(fill="x", padx=12, pady=(8, 10))
+
+        tk.Label(act_outer, text="ΠΡΟΒΟΛΗ · ΕΙΣΑΓΩΓΗ · ΕΞΑΓΩΓΗ",
+                 font=("Segoe UI", 7, "bold"), fg=C["text_dim"],
+                 bg=C["bg"]).pack(anchor="w", pady=(0, 6))
+
+        # Row 1: Χάρτης
+        row1 = tk.Frame(act_outer, bg=C["bg"])
+        row1.pack(fill="x", pady=(0, 4))
+        tk.Button(row1, text="🗺  Προβολή σε Χάρτη",
+                  command=self._preview_map,
+                  font=("Segoe UI", 9), relief="flat", bd=0,
+                  bg=C["green_light"], fg=C["green_dark"],
+                  activebackground=C["accent"],
+                  padx=10, pady=5, cursor="hand2"
+                  ).pack(side="left", padx=(0, 6))
+        style_box = ttk.Combobox(
+            row1, textvariable=self.map_style_var,
+            values=["OpenStreetMap", "ESRI Satellite", "Google Maps"],
+            width=14, state="readonly", style="Modern.TCombobox"
+        )
+        style_box.set("ESRI Satellite")
+        style_box.pack(side="left")
+
+        # Row 2: Προβολή γεωμετρίας
+        row2 = tk.Frame(act_outer, bg=C["bg"])
+        row2.pack(fill="x", pady=(0, 4))
+        tk.Button(row2, text="📐  Σχήμα & Εμβαδό",
+                  command=self._preview_polygon,
+                  font=("Segoe UI", 8), relief="flat", bd=0,
+                  bg=C["green_light"], fg=C["green_dark"],
+                  activebackground=C["accent"],
+                  padx=8, pady=5, cursor="hand2"
+                  ).pack(side="left")
+
+        # Row 3: Εισαγωγή — κοντά μεταξύ τους και χωριστά από τις εξαγωγές
+        row3 = tk.Frame(act_outer, bg=C["bg"])
+        row3.pack(fill="x", pady=(2, 4))
+        tk.Label(row3, text="Εισαγωγή:", font=("Segoe UI", 8),
+                 fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(0, 6))
+        for txt, cmd in [
+            ("Shapefile", self._import_shp),
+            ("DXF", self._import_dxf),
+        ]:
+            tk.Button(row3, text=txt, command=cmd,
+                      font=("Segoe UI", 8), relief="flat", bd=0,
+                      bg=C["input_bg"], fg=C["green_dark"],
+                      highlightthickness=1, highlightbackground=C["border"],
+                      activebackground=C["green_light"],
+                      padx=12, pady=4, cursor="hand2"
+                      ).pack(side="left", padx=(0, 5))
+
+        # Row 4: Εξαγωγή
+        row4 = tk.Frame(act_outer, bg=C["bg"])
+        row4.pack(fill="x", pady=(2, 0))
+        tk.Label(row4, text="Εξαγωγή:", font=("Segoe UI", 8),
+                 fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(0, 6))
+        for txt, cmd in [
+            ("Shapefile", self._export_shapefile),
+            ("DXF", self._export_dxf),
+        ]:
+            tk.Button(row4, text=txt, command=cmd,
+                      font=("Segoe UI", 8), relief="flat", bd=0,
+                      bg=C["green_light"], fg=C["green_dark"],
+                      activebackground=C["accent"],
+                      padx=12, pady=4, cursor="hand2"
+                      ).pack(side="left", padx=(0, 5))
+
+        return frame
+
+    def _create_egsa_frame(self) -> tk.Frame:
+        """Δημιουργία EGSA mode frame."""
+        frame = tk.Frame(self.root, bg=C["bg"])
+
+        PAD = {"padx": 12}
+
+        # ── Input ────────────────────────────────────────────────────────────
+        inp_outer = tk.Frame(frame, bg=C["bg"])
+        inp_outer.pack(fill="x", pady=(10, 4), **PAD)
+
+        hdr = tk.Frame(inp_outer, bg=C["bg"])
+        hdr.pack(fill="x")
+        tk.Label(hdr, text="Σημεία εισόδου  ",
+                 font=("Segoe UI", 9, "bold"), fg=C["text"],
+                 bg=C["bg"]).pack(side="left")
+        tk.Label(hdr, text="(Όνομα X Y)  ή  (X Y)  —  μία γραμμή ανά σημείο",
+                 font=("Segoe UI", 8), fg=C["text_dim"],
+                 bg=C["bg"]).pack(side="left")
+
+        self.egsa_input = tk.Text(
+            frame, width=48, height=6,
+            font=("Consolas", 9),
+            bg=C["input_bg"], fg=C["text"],
+            relief="flat", bd=0,
+            insertbackground=C["green_mid"],
+            selectbackground=C["accent"],
+            highlightthickness=1,
+            highlightbackground=C["border"],
+            highlightcolor=C["green_mid"],
+            padx=8, pady=6
+        )
+        self.egsa_input.pack(fill="x", padx=12)
+        add_context_menu(self.egsa_input)
+
+        btn_row = tk.Frame(frame, bg=C["bg"])
+        btn_row.pack(pady=(5, 0), **PAD)
+        for txt, cmd in [
+            ("📋  Επικόλληση", lambda: self._paste_to(self.egsa_input)),
+            ("✕  Καθαρισμός", lambda: self.egsa_input.delete("1.0", tk.END)),
+        ]:
+            tk.Button(btn_row, text=txt, command=cmd,
+                      font=("Segoe UI", 8), relief="flat", bd=0,
+                      bg=C["bg"], fg=C["text_mid"],
+                      activebackground=C["border"],
+                      padx=10, pady=4, cursor="hand2"
+                      ).pack(side="left", padx=(0, 6))
+
+        tk.Frame(frame, bg=C["border"], height=1).pack(fill="x", padx=12, pady=(8, 0))
+
+        calc_frame = tk.Frame(frame, bg=C["bg"])
+        calc_frame.pack(fill="x", padx=12, pady=8)
+        tk.Button(
+            calc_frame, text="  ➜   Επεξεργασία Πολυγώνου  ",
+            command=self._calculate_egsa,
+            font=("Segoe UI", 10, "bold"),
+            fg=C["white"], bg=C["blue_btn"],
+            activebackground="#1976d2", activeforeground=C["white"],
+            relief="flat", bd=0, pady=8, cursor="hand2"
+        ).pack(fill="x")
+
+        out_hdr = tk.Frame(frame, bg=C["bg"])
+        out_hdr.pack(fill="x", pady=(4, 2), **PAD)
+        tk.Label(out_hdr, text="Σημεία πολυγώνου",
+                 font=("Segoe UI", 9, "bold"), fg=C["text"],
+                 bg=C["bg"]).pack(side="left")
+        tk.Button(out_hdr, text="📄 Αντιγραφή",
+                  font=("Segoe UI", 8), relief="flat", bd=0,
+                  bg=C["bg"], fg=C["text_dim"],
+                  activebackground=C["border"],
+                  padx=8, pady=2, cursor="hand2",
+                  command=lambda: self._copy_text_to_clipboard(self.egsa_output)
+                  ).pack(side="right")
+
+        self.egsa_output = tk.Text(
+            frame, width=48, height=8,
+            font=("Consolas", 9),
+            bg=C["output_bg"], fg=C["text"],
+            state="disabled", relief="flat", bd=0,
+            highlightthickness=1,
+            highlightbackground=C["border"],
+            highlightcolor=C["border"],
+            padx=8, pady=6
+        )
+        self.egsa_output.pack(fill="x", padx=12)
+        add_context_menu(self.egsa_output)
+
+        self.lbl_egsa_only = tk.Label(frame, fg=C["green_mid"], bg=C["bg"],
+                                       font=("Segoe UI", 8))
+
+        if GE_AVAILABLE:
+            ge_frame = tk.Frame(frame, bg=C["bg"])
+            ge_frame.pack(fill="x", padx=12, pady=(10, 0))
+            tk.Button(
+                ge_frame, text="🌍  Άνοιγμα στο Google Earth",
+                command=self._open_google_earth_window,
+                font=("Segoe UI", 9, "bold"),
+                fg=C["white"], bg=C["green_mid"],
+                activebackground="#3a8e5f", activeforeground=C["white"],
+                relief="flat", bd=0, pady=7, cursor="hand2"
+            ).pack(fill="x")
+
+        tk.Frame(frame, bg=C["border"], height=1).pack(fill="x", padx=12, pady=(12, 0))
+
+        act_outer = tk.Frame(frame, bg=C["bg"])
+        act_outer.pack(fill="x", padx=12, pady=(8, 10))
+
+        tk.Label(act_outer, text="ΠΡΟΒΟΛΗ · ΕΙΣΑΓΩΓΗ · ΕΞΑΓΩΓΗ",
+                 font=("Segoe UI", 7, "bold"), fg=C["text_dim"],
+                 bg=C["bg"]).pack(anchor="w", pady=(0, 6))
+
+        row1 = tk.Frame(act_outer, bg=C["bg"])
+        row1.pack(fill="x", pady=(0, 4))
+        tk.Button(row1, text="🗺  Προβολή σε Χάρτη",
+                  command=self._preview_map,
+                  font=("Segoe UI", 9), relief="flat", bd=0,
+                  bg=C["green_light"], fg=C["green_dark"],
+                  activebackground=C["accent"],
+                  padx=10, pady=5, cursor="hand2"
+                  ).pack(side="left", padx=(0, 6))
+        style_box = ttk.Combobox(
+            row1, textvariable=self.map_style_var,
+            values=["OpenStreetMap", "ESRI Satellite", "Google Maps"],
+            width=14, state="readonly", style="Modern.TCombobox"
+        )
+        style_box.set("ESRI Satellite")
+        style_box.pack(side="left")
+
+        row2 = tk.Frame(act_outer, bg=C["bg"])
+        row2.pack(fill="x", pady=(0, 4))
+        tk.Button(row2, text="📐  Σχήμα & Εμβαδό",
+                  command=self._preview_polygon,
+                  font=("Segoe UI", 8), relief="flat", bd=0,
+                  bg=C["green_light"], fg=C["green_dark"],
+                  activebackground=C["accent"],
+                  padx=8, pady=5, cursor="hand2"
+                  ).pack(side="left")
+
+        row3 = tk.Frame(act_outer, bg=C["bg"])
+        row3.pack(fill="x", pady=(2, 4))
+        tk.Label(row3, text="Εισαγωγή:", font=("Segoe UI", 8),
+                 fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(0, 6))
+        for txt, cmd in [("Shapefile", self._import_shp), ("DXF", self._import_dxf)]:
+            tk.Button(row3, text=txt, command=cmd,
+                      font=("Segoe UI", 8), relief="flat", bd=0,
+                      bg=C["input_bg"], fg=C["green_dark"],
+                      highlightthickness=1, highlightbackground=C["border"],
+                      activebackground=C["green_light"],
+                      padx=12, pady=4, cursor="hand2"
+                      ).pack(side="left", padx=(0, 5))
+
+        row4 = tk.Frame(act_outer, bg=C["bg"])
+        row4.pack(fill="x", pady=(2, 0))
+        tk.Label(row4, text="Εξαγωγή:", font=("Segoe UI", 8),
+                 fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(0, 6))
+        for txt, cmd in [("Shapefile", self._export_shapefile), ("DXF", self._export_dxf)]:
+            tk.Button(row4, text=txt, command=cmd,
+                      font=("Segoe UI", 8), relief="flat", bd=0,
+                      bg=C["green_light"], fg=C["green_dark"],
+                      activebackground=C["accent"],
+                      padx=12, pady=4, cursor="hand2"
+                      ).pack(side="left", padx=(0, 5))
+
+        return frame
+
+    def _create_footer(self):
+        """Footer."""
+        footer = tk.Frame(self.root, bg=C["bg"], height=20)
+        footer.pack(side="bottom", fill="x")
+        tk.Frame(footer, bg=C["border"], height=1).pack(fill="x")
+        tk.Label(footer, text="∘ D.T. 2026",
+                 fg=C["text_dim"], bg=C["bg"],
+                 font=("Segoe UI", 8)
+                 ).pack(side="right", padx=10, pady=3)
+
+    def _switch_mode(self):
+        """Εναλλαγή μεταξύ HATT και EGSA mode."""
+        self._clear_area_labels()
+        
+        if self.mode_var.get() == "HATT":
+            self.frame_egsa.pack_forget()
+            self.frame_HATT.pack(fill="x", pady=5)
+        else:
+            self.frame_HATT.pack_forget()
+            self.frame_egsa.pack(fill="x", pady=5)
+    
+    def _paste_to(self, widget: tk.Text):
+        """Επικόλληση από clipboard."""
+        try:
+            widget.insert("insert", self.root.clipboard_get())
+        except tk.TclError:
+            messagebox.showwarning("Προειδοποίηση", 
+                                 "Το clipboard είναι κενό.")
+    
+    def _copy_text_to_clipboard(self, text_widget: tk.Text) -> None:
+        """Αντιγράφει όλο το περιεχόμενο ενός Text widget στο clipboard."""
+        content = text_widget.get("1.0", tk.END).strip()
+        if not content:
+            return
+        self.root.clipboard_clear()
+        self.root.clipboard_append(content)
+        logger.info("Αντιγραφή αποτελεσμάτων στο clipboard")
+
+    def _calculate_HATT(self):
+        """Υπολογισμός μετατροπής HATT → EGSA87."""
+        display_value = self.region_var.get()
+        current_region = self._region_display_to_name.get(display_value, display_value)
+        if current_region in UNVERIFIED_HATT_REGIONS:
+            if not messagebox.askyesno(
+                "Μη επαληθευμένη εγγραφή HATT",
+                UNVERIFIED_HATT_REGIONS[current_region] + "\n\nΝα συνεχιστεί παρ' όλα αυτά;"
+            ):
+                return
+        text = self.HATT_input.get("1.0", tk.END).strip()
+        
+        # Parse input
+        self.HATT_points, errors = self.parser.parse_points(text)
+        
+        if errors:
+            error_msg = "\n".join(errors[:5])  # Εμφάνιση πρώτων 5 σφαλμάτων
+            messagebox.showwarning("Προειδοποίηση", 
+                                 f"Κάποια σημεία αγνοήθηκαν:\n{error_msg}")
+        
+        if not self.HATT_points:
+            messagebox.showerror(MESSAGES['error_title'], 
+                               "Δεν βρέθηκαν έγκυρα σημεία.")
+            return
+        
+        # Transform to EGSA87
+        self.egsa_points = []
+        for p in self.HATT_points:
+            x_egsa, y_egsa = self.transformer.HATT_to_egsa(p.x, p.y)
+            self.egsa_points.append(Point(name=p.name, x=x_egsa, y=y_egsa))
+        
+        # Display results
+        self.HATT_output.config(state="normal")
+        self.HATT_output.delete("1.0", tk.END)
+        for p in self.egsa_points:
+            self.HATT_output.insert(tk.END, 
+                f"{p.name}\t{format_display(p.x)}\t{format_display(p.y)}\n")
+        self.HATT_output.config(state="disabled")
+        
+        # Update area labels
+        self._update_area_labels_HATT()
+        
+        logger.info(f"Converted {len(self.HATT_points)} points from HATT to EGSA87")
+    
+    def _calculate_egsa(self):
+        """Υπολογισμός με άμεση εισαγωγή EGSA87."""
+        text = self.egsa_input.get("1.0", tk.END).strip()
+        
+        # Parse input
+        self.egsa_points, errors = self.parser.parse_points(text)
+        self.HATT_points = []  # Clear HATT points
+        
+        if errors:
+            error_msg = "\n".join(errors[:5])
+            messagebox.showwarning("Προειδοποίηση", 
+                                 f"Κάποια σημεία αγνοήθηκαν:\n{error_msg}")
+        
+        if not self.egsa_points:
+            messagebox.showerror(MESSAGES['error_title'], 
+                               "Δεν βρέθηκαν έγκυρα σημεία.")
+            return
+        
+        # Display results
+        self.egsa_output.config(state="normal")
+        self.egsa_output.delete("1.0", tk.END)
+        for p in self.egsa_points:
+            self.egsa_output.insert(tk.END, 
+                f"{p.name}\t{format_display(p.x)}\t{format_display(p.y)}\n")
+        self.egsa_output.config(state="disabled")
+        
+        # Update area labels
+        self._update_area_labels_egsa()
+        
+        logger.info(f"Processed {len(self.egsa_points)} EGSA87 points")
+    
+    def _update_area_labels_HATT(self):
+        """Ενημέρωση labels εμβαδού για HATT mode με έλεγχο μη έγκυρης γεωμετρίας."""
+        self._clear_area_labels()
+
+        if len(self.HATT_points) < 3 or len(self.egsa_points) < 3:
+            return
+
+        if self.calculator.has_self_intersections(self.HATT_points):
+            self.lbl_diff.config(
+                text="Προειδοποίηση: το πολύγωνο HATT παρουσιάζει αυτοτομή — το εμβαδόν δεν υπολογίζεται.",
+                fg="#b42318"
+            )
+            self.lbl_diff.pack(anchor="w")
+            return
+
+        area_HATT = self.calculator.calculate_area(self.HATT_points).quantize(DISPLAY_DEC)
+        area_egsa = self.calculator.calculate_area(self.egsa_points).quantize(DISPLAY_DEC)
+
+        self.lbl_HATT_area.config(text=f"Εμβαδόν HATT: {format_display(area_HATT)} m²")
+        self.lbl_HATT_area.pack(anchor="w")
+        self.lbl_egsa_area.config(text=f"Εμβαδόν EGSA87: {format_display(area_egsa)} m²")
+        self.lbl_egsa_area.pack(anchor="w")
+
+        diff = (area_egsa - area_HATT).quantize(DISPLAY_DEC)
+        if area_HATT == 0:
+            self.lbl_diff.config(
+                text=f"Διαφορά: {format_display(diff)} m² (ποσοστό μη διαθέσιμο: μηδενικό εμβαδόν HATT)",
+                fg=C["text_mid"]
+            )
+        else:
+            pct = ((diff / area_HATT) * 100).quantize(DISPLAY_DEC)
+            self.lbl_diff.config(
+                text=f"Διαφορά: {format_display(diff)} m² ({format_display(pct)} %)",
+                fg=C["text_mid"]
+            )
+        self.lbl_diff.pack(anchor="w")
+
+    def _update_area_labels_egsa(self):
+        """Ενημέρωση labels εμβαδού για EGSA mode."""
+        self._clear_area_labels()
+
+        if len(self.egsa_points) >= 3:
+            if self.calculator.has_self_intersections(self.egsa_points):
+                self.lbl_egsa_only.config(
+                    text="Προειδοποίηση: το πολύγωνο παρουσιάζει αυτοτομή — το εμβαδόν δεν υπολογίζεται.",
+                    fg="#b42318"
+                )
+            else:
+                area = self.calculator.calculate_area(self.egsa_points).quantize(DISPLAY_DEC)
+                self.lbl_egsa_only.config(
+                    text=f"Εμβαδόν EGSA87: {format_display(area)} m²",
+                    fg=C["green_mid"]
+                )
+            self.lbl_egsa_only.pack(anchor="w")
+
+    def _clear_area_labels(self):
+        """Απόκρυψη όλων των area labels και επαναφορά χρωμάτων."""
+        self.lbl_HATT_area.config(fg=C["green_mid"])
+        self.lbl_egsa_area.config(fg=C["green_mid"])
+        self.lbl_diff.config(fg=C["text_mid"])
+        self.lbl_egsa_only.config(fg=C["green_mid"])
+        self.lbl_HATT_area.pack_forget()
+        self.lbl_egsa_area.pack_forget()
+        self.lbl_diff.pack_forget()
+        self.lbl_egsa_only.pack_forget()
+    
+    def _preview_map(self):
+        """Προβολή σημείων/πολυγώνου σε διαδραστικό χάρτη (Folium)."""
+        if not self.egsa_points:
+            messagebox.showerror(MESSAGES['error_title'], "Δεν υπάρχουν σημεία.")
+            return
+
+        # Convert to WGS84
+        coords_wgs = []
+        for p in self.egsa_points:
+            lon, lat = self.transformer.egsa_to_wgs84(p.x, p.y)
+            coords_wgs.append((lat, lon))
+        
+        # Calculate center
+        center_lat = sum(c[0] for c in coords_wgs) / len(coords_wgs)
+        center_lon = sum(c[1] for c in coords_wgs) / len(coords_wgs)
+        
+        style = self.map_style_var.get()
+
+        # ── Google Maps: άνοιγμα στον browser με pin στο πρώτο σημείο ─────────
+        if style == "Google Maps":
+            first_lat, first_lon = coords_wgs[0]
+            url = f"https://www.google.com/maps?q={first_lat:.8f},{first_lon:.8f}"
+            webbrowser.open(url)
+            logger.info(f"Google Maps opened (pin on '{self.egsa_points[0].name}'): {url}")
+            return
+        # ─────────────────────────────────────────────────────────────────────
+
+        # Create folium map
+        if style == "OpenStreetMap":
+            m = folium.Map(location=[center_lat, center_lon],
+                          zoom_start=15, tiles="OpenStreetMap")
+        elif style == "ESRI Satellite":
+            m = folium.Map(location=[center_lat, center_lon],
+                          zoom_start=15, tiles=None)
+            folium.TileLayer(
+                tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                attr="Esri Satellite",
+                name="Satellite",
+                control=False
+            ).add_to(m)
+
+        n = len(self.egsa_points)
+
+        if n == 1:
+            # Μεμονωμένο σημείο → marker με CircleMarker
+            folium.CircleMarker(
+                coords_wgs[0], radius=8,
+                color="red", fill=True, fill_color="blue", fill_opacity=0.7
+            ).add_to(m)
+        elif n == 2:
+            # Δύο σημεία → γραμμή (απόσταση)
+            folium.PolyLine(coords_wgs, color="red", weight=2.5).add_to(m)
+        else:
+            # Τρία+ σημεία → κλειστό πολύγωνο με fill
+            folium.PolyLine(
+                coords_wgs + [coords_wgs[0]],
+                color="red", weight=2, fill=True, fill_color="blue",
+                fill_opacity=0.3
+            ).add_to(m)
+
+        # Markers με ονόματα (για όλες τις περιπτώσεις)
+        for (lat, lon), p in zip(coords_wgs, self.egsa_points):
+            folium.Marker(
+                [lat, lon],
+                icon=folium.DivIcon(
+                    html=f"<div style='color:black; font-size:12px; font-weight:bold;'>{p.name}</div>"
+                )
+            ).add_to(m)
+
+        # Fit bounds — για 1 σημείο χρησιμοποιούμε location αντί fit_bounds
+        if n == 1:
+            m.location = list(coords_wgs[0])
+            m.zoom_start = 16
+        else:
+            m.fit_bounds(coords_wgs)
+
+        # Save and open
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.html')
+        temp_files.append(tmp.name)
+        m.save(tmp.name)
+        webbrowser.open(tmp.name)
+
+        logger.info(f"Map preview opened: {tmp.name}")
+    
+    def _preview_polygon(self):
+        """Προβολή σημείων/γραμμής/πολυγώνου με matplotlib."""
+        if not self.egsa_points:
+            messagebox.showerror(MESSAGES['error_title'], "Δεν υπάρχουν σημεία.")
+            return
+
+        n = len(self.egsa_points)
+
+        # Για 1 σημείο: απλό scatter plot
+        # Για 2 σημεία: γραμμή με απόσταση
+        # Για 3+: κλειστό πολύγωνο με εμβαδό
+        if n >= 3:
+            closed = self.egsa_points + [self.egsa_points[0]]
+        else:
+            closed = self.egsa_points
+
+        xs = [float(p.x) for p in closed]
+        ys = [float(p.y) for p in closed]
+
+        plt.figure(f"Προβολή EGSA87 – v{APP_VERSION}")
+        plt.plot(xs, ys, marker="o")
+
+        if n >= 3:
+            area = self.calculator.calculate_area(self.egsa_points).quantize(DISPLAY_DEC)
+            plt.title("Πολύγωνο σε EGSA87")
+        elif n == 2:
+            dist = self.calculator.calculate_distance(self.egsa_points[0], self.egsa_points[1])
+            plt.title(f"Τμήμα σε EGSA87  |  Απόσταση: {format_display(dist)} m")
+        else:
+            plt.title("Σημείο σε EGSA87")
+        
+        ax = plt.gca()
+        ax.set_aspect("equal", adjustable="datalim")
+        ax.ticklabel_format(style='plain', useOffset=False)
+
+        xf = ScalarFormatter(useOffset=False)
+        yf = ScalarFormatter(useOffset=False)
+        xf.set_scientific(False)
+        yf.set_scientific(False)
+        ax.xaxis.set_major_formatter(xf)
+        ax.yaxis.set_major_formatter(yf)
+
+        # Εμβαδό μόνο για ≥3 σημεία
+        if n >= 3:
+            ax.text(0.02, 0.02,
+                    f"Εμβαδό: {format_display(area)} m²\n(Βορράς ↑)",
+                    transform=ax.transAxes, fontsize=10,
+                    bbox=dict(facecolor="white", alpha=0.7, edgecolor="none"))
+        else:
+            ax.text(0.02, 0.02, "(Βορράς ↑)",
+                    transform=ax.transAxes, fontsize=10,
+                    bbox=dict(facecolor="white", alpha=0.7, edgecolor="none"))
+
+        # Ονόματα σημείων
+        for p in self.egsa_points:
+            plt.text(float(p.x) + 0.8, float(p.y) - 0.8, p.name, fontsize=10)
+
+        # Αποστάσεις πλευρών — για πολύγωνο όλες οι πλευρές, για 2 σημεία μόνο η μία
+        if n >= 3:
+            edges = [(self.egsa_points[i], self.egsa_points[(i + 1) % n]) for i in range(n)]
+        elif n == 2:
+            edges = [(self.egsa_points[0], self.egsa_points[1])]
+        else:
+            edges = []
+
+        for p1, p2 in edges:
+            d = self.calculator.calculate_distance(p1, p2)
+            mx = (float(p1.x) + float(p2.x)) / 2
+            my = (float(p1.y) + float(p2.y)) / 2
+            plt.text(mx + 1, my + 1, f"{format_display(d)} m",
+                    fontsize=9,
+                    bbox=dict(facecolor="white", alpha=0.6, edgecolor="none"))
+
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
+        logger.info("Preview displayed")
+    
+    def _export_shapefile(self):
+        """Εξαγωγή σημείων/γραμμής/πολυγώνου σε Shapefile."""
+        if not self.egsa_points:
+            messagebox.showerror(MESSAGES['error_title'], "Δεν υπάρχουν σημεία.")
+            return
+        
+        # Ask for file path
+        shp_path = filedialog.asksaveasfilename(
+            defaultextension=".shp",
+            filetypes=[("Shapefile", "*.shp")]
+        )
+        
+        if not shp_path:
+            return
+        
+        try:
+            geometry_name = self.exporter.export_geometry(self.egsa_points, shp_path)
+            messagebox.showinfo("Εξαγωγή Shapefile",
+                f"Η εξαγωγή ολοκληρώθηκε επιτυχώς.\n\n"
+                f"Τύπος γεωμετρίας: {geometry_name}\n"
+                f"Σύστημα αναφοράς: ΕΓΣΑ87 / EPSG:2100")
+        except Exception as e:
+            logger.exception("Shapefile export failed")
+            messagebox.showerror("Σφάλμα Shapefile", f"Αποτυχία εξαγωγής:\n{e}")
+
+    def _export_dxf(self):
+        """Εξαγωγή DXF: μία polyline και προαιρετικά ονόματα κορυφών, χωρίς POINT entities."""
+        if not self.egsa_points:
+            messagebox.showerror(MESSAGES['error_title'], "Δεν υπάρχουν σημεία.")
+            return
+        if not DXF_AVAILABLE:
+            messagebox.showerror("DXF", "Η βιβλιοθήκη ezdxf δεν είναι διαθέσιμη σε αυτή την εγκατάσταση.")
+            return
+
+        dxf_path = filedialog.asksaveasfilename(
+            defaultextension=".dxf",
+            filetypes=[("AutoCAD DXF", "*.dxf")],
+            title="Εξαγωγή σε DXF"
+        )
+        if not dxf_path:
+            return
+
+        try:
+            doc = ezdxf.new('R2010')
+            doc.units = dxf_units.M
+            msp = doc.modelspace()
+
+            doc.layers.add('EGSA_BOUNDARY', color=1)
+            doc.layers.add('EGSA_LABELS', color=3)
+
+            pts = [(float(p.x), float(p.y)) for p in self.egsa_points]
+            if len(pts) == 1:
+                messagebox.showwarning(
+                    "Εξαγωγή DXF",
+                    "Για DXF απαιτούνται τουλάχιστον δύο σημεία ώστε να δημιουργηθεί γραμμή."
+                )
+                return
+
+            msp.add_lwpolyline(
+                pts,
+                close=(len(pts) >= 3),
+                dxfattribs={'layer': 'EGSA_BOUNDARY'}
+            )
+
+            xs = [xy[0] for xy in pts]
+            ys = [xy[1] for xy in pts]
+            span = max(max(xs) - min(xs), max(ys) - min(ys))
+            txt_h = max(0.5, min(span * 0.015, 5.0)) if span else 1.0
+
+            for point, (x, y) in zip(self.egsa_points, pts):
+                msp.add_text(point.name, dxfattribs={
+                    'layer': 'EGSA_LABELS',
+                    'height': txt_h,
+                    'insert': (x + txt_h * 0.5, y + txt_h * 0.5),
+                })
+
+            doc.saveas(dxf_path)
+            geometry = "κλειστή polyline" if len(pts) >= 3 else "ανοικτή polyline"
+            messagebox.showinfo(
+                "Εξαγωγή DXF",
+                f"Η εξαγωγή ολοκληρώθηκε επιτυχώς.\n\n"
+                f"Γεωμετρία: {geometry}\n"
+                f"Layers: EGSA_BOUNDARY, EGSA_LABELS\n"
+                f"Σύστημα: ΕΓΣΑ87 · μονάδες σε μέτρα"
+            )
+            logger.info(f"DXF exported: {dxf_path}")
+
+        except Exception as e:
+            messagebox.showerror("Σφάλμα DXF", f"Αποτυχία εξαγωγής:\n{e}")
+            logger.exception("DXF export error")
+
+    @staticmethod
+    def _auto_point_name(index: int) -> str:
+        letters = 'ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ'
+        return letters[index] if index < len(letters) else f"P{index + 1}"
+
+    def _choose_dxf_polyline(self, candidates: list, source_name: str):
+        """Modal επιλογή polyline όταν ένα DXF περιέχει περισσότερες από μία."""
+        if len(candidates) == 1:
+            return candidates[0]
+
+        choice = {"value": None}
+        win = tk.Toplevel(self.root)
+        win.title("Επιλογή γεωμετρίας DXF")
+        win.transient(self.root)
+        win.grab_set()
+        win.resizable(True, True)
+        win.geometry("620x360")
+
+        tk.Label(win, text="Βρέθηκαν περισσότερες από μία polylines",
+                 font=("Segoe UI", 11, "bold"), fg=C["green_dark"]).pack(anchor="w", padx=14, pady=(14, 2))
+        tk.Label(win, text=f"Αρχείο: {source_name}\nΕπίλεξε τη γεωμετρία που θέλεις να εισαγάγεις.",
+                 font=("Segoe UI", 9), fg=C["text_mid"], justify="left").pack(anchor="w", padx=14, pady=(0, 10))
+
+        frame = tk.Frame(win)
+        frame.pack(fill="both", expand=True, padx=14)
+        scrollbar = tk.Scrollbar(frame)
+        scrollbar.pack(side="right", fill="y")
+        lb = tk.Listbox(frame, font=("Consolas", 9), yscrollcommand=scrollbar.set, exportselection=False)
+        lb.pack(fill="both", expand=True)
+        scrollbar.config(command=lb.yview)
+
+        for i, item in enumerate(candidates, 1):
+            state = "ΚΛΕΙΣΤΗ" if item["closed"] else "ΑΝΟΙΚΤΗ"
+            lb.insert(tk.END, f"{i:>2}. {state:<8}  κορυφές: {len(item['points']):>4}  layer: {item['layer']}")
+        lb.selection_set(0)
+
+        def accept():
+            selected = lb.curselection()
+            if selected:
+                choice["value"] = candidates[selected[0]]
+                win.destroy()
+
+        controls = tk.Frame(win)
+        controls.pack(fill="x", padx=14, pady=12)
+        tk.Button(controls, text="Ακύρωση", command=win.destroy,
+                  font=("Segoe UI", 9), relief="flat", padx=14, pady=6).pack(side="right")
+        tk.Button(controls, text="Εισαγωγή επιλεγμένης", command=accept,
+                  font=("Segoe UI", 9, "bold"), bg=C["green_mid"], fg=C["white"],
+                  activebackground=C["green_dark"], activeforeground=C["white"],
+                  relief="flat", padx=14, pady=6).pack(side="right", padx=(0, 8))
+        lb.bind("<Double-Button-1>", lambda _e: accept())
+        win.protocol("WM_DELETE_WINDOW", win.destroy)
+        self.root.wait_window(win)
+        return choice["value"]
+
+    def _import_dxf(self):
+        """Εισαγωγή κορυφών από LWPOLYLINE/POLYLINE DXF ως δεδομένα ΕΓΣΑ87."""
+        if not DXF_AVAILABLE:
+            messagebox.showerror("DXF", "Η βιβλιοθήκη ezdxf δεν είναι διαθέσιμη σε αυτή την εγκατάσταση.")
+            return
+
+        dxf_path = filedialog.askopenfilename(
+            filetypes=[("AutoCAD DXF", "*.dxf")],
+            title="Εισαγωγή κορυφών από DXF"
+        )
+        if not dxf_path:
+            return
+
+        try:
+            doc = ezdxf.readfile(dxf_path)
+            msp = doc.modelspace()
+            candidates = []
+
+            for entity in msp:
+                kind = entity.dxftype()
+                if kind == 'LWPOLYLINE':
+                    pts = [(float(x), float(y)) for x, y, *_ in entity.get_points('xy')]
+                    closed = bool(entity.closed)
+                elif kind == 'POLYLINE' and not bool(getattr(entity, 'is_3d_polyline', False)):
+                    pts = [(float(v.dxf.location.x), float(v.dxf.location.y)) for v in entity.vertices]
+                    closed = bool(entity.is_closed)
+                else:
+                    continue
+
+                if len(pts) > 1 and pts[0] == pts[-1]:
+                    pts = pts[:-1]
+                    closed = True
+                if len(pts) >= 2:
+                    candidates.append({
+                        "points": pts,
+                        "closed": closed,
+                        "layer": entity.dxf.layer or "0",
+                    })
+
+            if not candidates:
+                messagebox.showwarning(
+                    "Εισαγωγή DXF",
+                    "Δεν βρέθηκε LWPOLYLINE ή 2D POLYLINE με τουλάχιστον δύο κορυφές."
+                )
+                return
+
+            selected = self._choose_dxf_polyline(candidates, Path(dxf_path).name)
+            if selected is None:
+                return
+
+            pts = selected["points"]
+            xs = [x for x, _ in pts]
+            ys = [y for _, y in pts]
+            span = max(max(xs) - min(xs), max(ys) - min(ys)) if len(pts) > 1 else 0.0
+            label_radius = max(2.0, span * 0.05)
+
+            labels = []
+            for entity in msp.query('TEXT MTEXT'):
+                try:
+                    if entity.dxftype() == 'TEXT':
+                        label = entity.dxf.text.strip()
+                        pos = entity.dxf.insert
+                    else:
+                        label = entity.plain_text().strip()
+                        pos = entity.dxf.insert
+                    if label:
+                        labels.append((label, float(pos.x), float(pos.y)))
+                except Exception:
+                    continue
+
+            used_labels = set()
+            named_points = []
+            for i, (x, y) in enumerate(pts):
+                best = None
+                for j, (label, tx, ty) in enumerate(labels):
+                    if j in used_labels:
+                        continue
+                    distance = math.hypot(tx - x, ty - y)
+                    if distance <= label_radius and (best is None or distance < best[0]):
+                        best = (distance, j, label)
+                if best:
+                    used_labels.add(best[1])
+                    name = safe_point_name(best[2], self._auto_point_name(i))
+                else:
+                    name = self._auto_point_name(i)
+                named_points.append((name, x, y))
+
+            unit_names = {
+                0: "χωρίς δήλωση", 1: "ίντσες", 2: "πόδια", 3: "μίλια",
+                4: "χιλιοστά", 5: "εκατοστά", 6: "μέτρα", 7: "χιλιόμετρα",
+            }
+            unit_name = unit_names.get(int(doc.units or 0), f"κωδικός {doc.units}")
+
+            plausible = all(100000 <= x <= 900000 and 3800000 <= y <= 4700000 for _, x, y in named_points)
+            warnings = []
+            if doc.units not in (0, dxf_units.M):
+                warnings.append(f"Το DXF δηλώνει μονάδες: {unit_name}, όχι μέτρα.")
+            if not plausible:
+                warnings.append("Οι τιμές δεν βρίσκονται όλες στο συνήθες εύρος ΕΓΣΑ87 για την Ελλάδα.")
+
+            confirmation = (
+                "Το αρχείο θα εισαχθεί ως ΕΓΣΑ87 (EPSG:2100), με μονάδες σε μέτρα.\n\n"
+                f"Κορυφές: {len(named_points)}\n"
+                f"Γεωμετρία: {'κλειστή' if selected['closed'] else 'ανοικτή'} polyline\n"
+                f"Layer: {selected['layer']}"
+            )
+            if warnings:
+                confirmation += "\n\nΠΡΟΕΙΔΟΠΟΙΗΣΗ:\n• " + "\n• ".join(warnings)
+            confirmation += "\n\nΝα συνεχιστεί η εισαγωγή;"
+            if not messagebox.askyesno("Επιβεβαίωση εισαγωγής DXF", confirmation):
+                return
+
+            lines = "\n".join(f"{name} {x:.3f} {y:.3f}" for name, x, y in named_points)
+            self.mode_var.set("egsa")
+            self._switch_mode()
+            self.egsa_input.delete("1.0", tk.END)
+            self.egsa_input.insert("1.0", lines)
+
+            messagebox.showinfo(
+                "Εισαγωγή DXF",
+                f"Εισήχθησαν {len(named_points)} κορυφές.\n"
+                "Πάτησε «Επεξεργασία Πολυγώνου» για υπολογισμό και έλεγχο."
+            )
+            logger.info(f"DXF imported: {dxf_path}, vertices={len(named_points)}")
+
+        except Exception as e:
+            messagebox.showerror("Σφάλμα DXF", f"Αποτυχία εισαγωγής:\n{e}")
+            logger.exception("DXF import error")
+
+    def _choose_shp_geometry(self, candidates: list, source_name: str):
+        """Modal επιλογή feature/part όταν ένα Shapefile περιέχει περισσότερες γεωμετρίες."""
+        if len(candidates) == 1:
+            return candidates[0]
+
+        choice = {"value": None}
+        win = tk.Toplevel(self.root)
+        win.title("Επιλογή γεωμετρίας Shapefile")
+        win.transient(self.root)
+        win.grab_set()
+        win.resizable(True, True)
+        win.geometry("700x390")
+
+        tk.Label(win, text="Βρέθηκαν περισσότερες από μία γεωμετρίες",
+                 font=("Segoe UI", 11, "bold"), fg=C["green_dark"]).pack(anchor="w", padx=14, pady=(14, 2))
+        tk.Label(win, text=f"Αρχείο: {source_name}\nΕπίλεξε το feature/part που θέλεις να εισαγάγεις. Δεν ενώνονται αυτόματα διαφορετικές γεωμετρίες.",
+                 font=("Segoe UI", 9), fg=C["text_mid"], justify="left").pack(anchor="w", padx=14, pady=(0, 10))
+
+        frame = tk.Frame(win)
+        frame.pack(fill="both", expand=True, padx=14)
+        scrollbar = tk.Scrollbar(frame)
+        scrollbar.pack(side="right", fill="y")
+        lb = tk.Listbox(frame, font=("Consolas", 9), yscrollcommand=scrollbar.set, exportselection=False)
+        lb.pack(fill="both", expand=True)
+        scrollbar.config(command=lb.yview)
+
+        for i, item in enumerate(candidates, 1):
+            label = item.get("feature_name", "")
+            lb.insert(tk.END,
+                f"{i:>2}. {item['geometry_type']:<8} feature:{item['feature_index']:>3} "
+                f"part:{item['part_index']:>2} κορυφές:{len(item['points']):>5}  {label}")
+        lb.selection_set(0)
+
+        def accept():
+            selected = lb.curselection()
+            if selected:
+                choice["value"] = candidates[selected[0]]
+                win.destroy()
+
+        controls = tk.Frame(win)
+        controls.pack(fill="x", padx=14, pady=12)
+        tk.Button(controls, text="Ακύρωση", command=win.destroy,
+                  font=("Segoe UI", 9), relief="flat", padx=14, pady=6).pack(side="right")
+        tk.Button(controls, text="Εισαγωγή επιλεγμένης", command=accept,
+                  font=("Segoe UI", 9, "bold"), bg=C["green_mid"], fg=C["white"],
+                  activebackground=C["green_dark"], activeforeground=C["white"],
+                  relief="flat", padx=14, pady=6).pack(side="right", padx=(0, 8))
+        lb.bind("<Double-Button-1>", lambda _e: accept())
+        win.protocol("WM_DELETE_WINDOW", win.destroy)
+        self.root.wait_window(win)
+        return choice["value"]
+
+    def _import_shp(self):
+        """
+        Εισαγωγή μίας ρητά επιλεγμένης γεωμετρίας από Shapefile ως ΕΓΣΑ87.
+        Multi-feature και multipart αρχεία δεν συγχωνεύονται ποτέ σιωπηρά.
+        """
+        shp_path = filedialog.askopenfilename(
+            filetypes=[("Shapefile", "*.shp")],
+            title="Εισαγωγή από Shapefile"
+        )
+        if not shp_path:
+            return
+
+        try:
+            prj_path = Path(shp_path).with_suffix(".prj")
+            if prj_path.exists():
+                prj_text = prj_path.read_text(encoding="utf-8", errors="ignore")
+                if not is_epsg2100_prj(prj_text):
+                    if not messagebox.askyesno(
+                        "Έλεγχος συστήματος αναφοράς",
+                        "Το .prj δεν αναγνωρίστηκε από το pyproj ως ΕΓΣΑ87 / EPSG:2100.\n"
+                        "Η εισαγωγή δεν πραγματοποιεί μετασχηματισμό συντεταγμένων.\n\n"
+                        "Να συνεχιστεί η εισαγωγή θεωρώντας τις τιμές ως ΕΓΣΑ87;"
+                    ):
+                        return
+            else:
+                if not messagebox.askyesno(
+                    "Δεν βρέθηκε αρχείο .prj",
+                    "Δεν υπάρχει συνοδευτικό .prj. Οι συντεταγμένες θα θεωρηθούν ΕΓΣΑ87.\n\nΝα συνεχιστεί;"
+                ):
+                    return
+
+            dbf_encoding = shapefile_text_encoding(shp_path)
+            r = shapefile.Reader(shp_path, encoding=dbf_encoding, encodingErrors="replace")
+            candidates = extract_shapefile_candidates(r)
+
+            if not candidates:
+                messagebox.showwarning(
+                    "Εισαγωγή Shapefile",
+                    "Δεν βρέθηκε υποστηριζόμενη γεωμετρία POINT, POLYLINE ή POLYGON."
+                )
+                return
+
+            selected = self._choose_shp_geometry(candidates, Path(shp_path).name)
+            if selected is None:
+                return
+
+            pts = selected["points"]
+            extracted = []
+            if selected["geometry_type"] == "POINT":
+                x, y = pts[0]
+                extracted.append((safe_point_name(selected["feature_name"], "P1"), x, y))
+            else:
+                for i, (x, y) in enumerate(pts):
+                    extracted.append((self._auto_point_name(i), x, y))
+
+            plausible = all(100000 <= x <= 900000 and 3800000 <= y <= 4700000 for _, x, y in extracted)
+            confirmation = (
+                f"Γεωμετρία: {selected['geometry_type']}\n"
+                f"Feature: {selected['feature_index']} · Part: {selected['part_index']}\n"
+                f"Κορυφές: {len(extracted)}\n"
+                "Σύστημα: ΕΓΣΑ87 / EPSG:2100 (χωρίς αυτόματο reprojection)"
+            )
+            if not plausible:
+                confirmation += (
+                    "\n\nΠΡΟΕΙΔΟΠΟΙΗΣΗ: Οι τιμές δεν βρίσκονται όλες στο συνήθες εύρος "
+                    "ΕΓΣΑ87 για την Ελλάδα."
+                )
+            confirmation += "\n\nΝα συνεχιστεί η εισαγωγή;"
+            if not messagebox.askyesno("Επιβεβαίωση εισαγωγής Shapefile", confirmation):
+                return
+
+            lines = "\n".join(f"{n} {x:.3f} {y:.3f}" for n, x, y in extracted)
+            self.mode_var.set("egsa")
+            self._switch_mode()
+            self.egsa_input.delete("1.0", tk.END)
+            self.egsa_input.insert("1.0", lines)
+
+            messagebox.showinfo(
+                "Εισαγωγή Shapefile",
+                f"Εισήχθησαν {len(extracted)} σημεία από το επιλεγμένο "
+                f"{selected['geometry_type']}.\nΠάτησε «Επεξεργασία Πολυγώνου» για υπολογισμό και έλεγχο."
+            )
+            logger.info(
+                "Shapefile imported: %s feature=%s part=%s vertices=%s",
+                shp_path, selected["feature_index"], selected["part_index"], len(extracted)
+            )
+
+        except Exception as e:
+            messagebox.showerror("Σφάλμα Shapefile", f"Αποτυχία εισαγωγής:\n{e}")
+            logger.exception("SHP import error")
+
+    def _region_info_text(self, region: str) -> str:
+        """Επιστρέφει τα στοιχεία κέντρου του επιλεγμένου φύλλου HATT."""
+        if not HATT_COEFFICIENTS or region not in HATT_COEFFICIENTS:
+            return ""
+        d = HATT_COEFFICIENTS[region]
+        phi_s = format_hatt_angle(d.get('phi0'))
+        lam_s = format_hatt_angle(d.get('lam0'))
+        return f"φ₀={phi_s}   λ₀={lam_s} από Αθήνα"
+
+    def _on_region_changed(self, event=None) -> None:
+        """Καλείται όταν ο χρήστης επιλέγει νέο φύλλο HATT."""
+        display_value = self.region_var.get()
+        region = self._region_display_to_name.get(display_value, display_value)
+        try:
+            self.transformer.set_region(region)
+            # Ενημέρωση κωδικού φύλλου
+            self.region_code_lbl.config(text=self._region_info_text(region))
+            if region in UNVERIFIED_HATT_REGIONS:
+                messagebox.showwarning(
+                    "Μη επαληθευμένη εγγραφή HATT",
+                    UNVERIFIED_HATT_REGIONS[region]
+                )
+            # Αν υπάρχουν ήδη αποτελέσματα, τα καθαρίζουμε (είναι για την παλιά περιοχή)
+            if self.HATT_points:
+                self.HATT_output.config(state="normal")
+                self.HATT_output.delete("1.0", tk.END)
+                self.HATT_output.config(state="disabled")
+                self.HATT_points.clear()
+                self.egsa_points.clear()
+                self._clear_area_labels()
+            logger.info(f"Region changed to: {region}")
+        except KeyError as e:
+            messagebox.showerror("Σφάλμα", f"Άγνωστη περιοχή: {e}")
+
+    def _on_close(self):
+        """Κλείσιμο εφαρμογής με καθαρισμό GE service."""
+        if self.ge_service:
+            try:
+                self.ge_service.shutdown()
+            except Exception:
+                pass
+        cleanup_temp_files()
+        self.root.destroy()
+
+    def _on_ge_camera_update(self, egsa_x: float, egsa_y: float, lon: float, lat: float):
+        """Callback: ενημερώνει τα labels του GE παραθύρου με live ΕΓΣΑ87 συντεταγμένες.
+        Καλείται από HTTP thread → χρησιμοποιούμε root.after() για thread-safe UI update."""
+        def _update():
+            self._ge_cam_x_var.set(f"{egsa_x:.3f}")
+            self._ge_cam_y_var.set(f"{egsa_y:.3f}")
+            self._ge_cam_lon_var.set(f"{lon:.6f}")
+            self._ge_cam_lat_var.set(f"{lat:.6f}")
+        self.root.after(0, _update)
+
+    def _open_google_earth_window(self):
+        """Ανοίγει ή φέρνει στο προσκήνιο το Google Earth Live παράθυρο."""
+        if not self.ge_service:
+            messagebox.showerror("Google Earth", 
+                "Η υπηρεσία Google Earth δεν είναι διαθέσιμη.\n"
+                "Βεβαιωθείτε ότι οι φάκελοι kml/, services/, utils/ βρίσκονται δίπλα στο egsa_suite.py")
+            return
+
+        # Αν το παράθυρο υπάρχει ήδη, το φέρνουμε μπροστά
+        if self.ge_window and self.ge_window.winfo_exists():
+            self.ge_window.lift()
+            self.ge_window.focus_force()
+            # Στέλνουμε τα τρέχοντα σημεία αν υπάρχουν
+            self._ge_send_current_points()
+            return
+
+        # Δημιουργία νέου παραθύρου
+        win = tk.Toplevel(self.root)
+        self.ge_window = win
+        win.title("🌍 Google Earth Live – ΕΓΣΑ87")
+        win.minsize(380, 500)
+        win.resizable(True, True)
+
+        # Τοποθέτηση δεξιά από το κύριο παράθυρο
+        main_x = self.root.winfo_x()
+        main_y = self.root.winfo_y()
+        main_w = self.root.winfo_width()
+        win.geometry(f"420x540+{main_x + main_w + 10}+{main_y}")
+
+        # ── Τίτλος ────────────────────────────────────────────────
+        title_row = tk.Frame(win)
+        title_row.pack(fill="x", padx=12, pady=(12, 0))
+
+        title_col = tk.Frame(title_row)
+        title_col.pack(side="left")
+        tk.Label(title_col, text="Google Earth Live",
+                 font=("Segoe UI", 12, "bold"), fg="#2a6e3f").pack(anchor="w")
+        tk.Label(title_col, text="Σύνδεση μέσω KML NetworkLink · HTTP localhost",
+                 font=("Segoe UI", 8), fg="#888").pack(anchor="w")
+
+        ge_always_on_top_var = tk.BooleanVar(master=win, value=False)
+        tk.Checkbutton(
+            title_row, text="📌",
+            variable=ge_always_on_top_var,
+            command=lambda: win.attributes("-topmost", ge_always_on_top_var.get()),
+            font=("Segoe UI", 9)
+        ).pack(side="right", anchor="ne")
+
+        ttk.Separator(win, orient="horizontal").pack(fill="x", padx=12, pady=10)
+
+        # ── Status ────────────────────────────────────────────────
+        status_frame = tk.Frame(win, bg="#f0f8f0", relief="flat", bd=0)
+        status_frame.pack(fill="x", padx=12, pady=(0,4))
+        self._ge_status_var = tk.StringVar(master=win, value="Αναμονή σύνδεσης από το Google Earth…")
+        self._ge_status_label = tk.Label(status_frame,
+                 textvariable=self._ge_status_var,
+                 font=("Segoe UI", 9), fg="#8a6d00", bg="#fff8df",
+                 wraplength=360, justify="left")
+        self._ge_status_label.pack(padx=10, pady=8, anchor="w")
+
+        # Δευτερεύον κουμπί για χειροκίνητο άνοιγμα / επαναποστολή
+        action_row = tk.Frame(win)
+        action_row.pack(fill="x", padx=12, pady=(0, 4))
+
+        tk.Button(action_row, text="🌍  Ξανάνοιγμα Google Earth",
+                  command=lambda: self.ge_service.open_in_google_earth(),
+                  bg="#1f6feb", fg="white", font=("Segoe UI", 9),
+                  relief="flat", padx=10, pady=4).pack(side="left", padx=(0,6))
+
+        tk.Button(action_row, text="🗺  Google Maps",
+                  command=self._open_google_maps_browser,
+                  font=("Segoe UI", 9), fg="#1f6feb",
+                  relief="flat", cursor="hand2", padx=6, pady=4).pack(side="left")
+        tk.Label(action_row, text="(pin στο 1ο σημείο)",
+                 font=("Segoe UI", 7), fg="#aaa").pack(side="left", padx=4)
+
+        # ── Αποστολή σημείων ──────────────────────────────────────
+        step2 = tk.LabelFrame(win, text=" Σημεία στο Google Earth ",
+                               font=("Segoe UI", 9), padx=8, pady=8)
+        step2.pack(fill="x", padx=12, pady=4)
+
+        pts_info = tk.Label(step2, text="—", font=("Segoe UI", 9), fg="#444")
+        pts_info.pack(anchor="w")
+        self._ge_pts_info_label = pts_info
+
+        btn_row = tk.Frame(step2)
+        btn_row.pack(pady=(6, 0))
+
+        tk.Button(btn_row, text="📍 Στείλε σημεία στο GE",
+                  command=lambda: [self._ge_send_current_points(),
+                                   self.root.after(500, self._ge_trigger_fly_to)],
+                  bg="#2a6e3f", fg="white", font=("Segoe UI", 9, "bold"),
+                  width=20).pack(side="left", padx=4)
+
+        tk.Button(btn_row, text="🗑 Καθαρισμός",
+                  command=self._ge_clear_points,
+                  width=10).pack(side="left", padx=4)
+
+        # ── Camera Tracking ────────────────────────────────────────
+        cam_frame = tk.LabelFrame(win, text=" Camera Tracking – Κέντρο οθόνης GE ",
+                                   font=("Segoe UI", 9), padx=8, pady=8)
+        cam_frame.pack(fill="x", padx=12, pady=4)
+
+        tk.Label(cam_frame, 
+                 text="Καθώς κινείτε τον χάρτη στο Google Earth,\n"
+                      "οι ΕΓΣΑ87 συντεταγμένες ενημερώνονται live:",
+                 font=("Segoe UI", 9), justify="left").pack(anchor="w")
+
+        grid = tk.Frame(cam_frame)
+        grid.pack(anchor="w", pady=(6, 0))
+
+        lbl_style = {"font": ("Segoe UI", 9), "anchor": "w", "width": 12}
+        val_style = {"font": ("Consolas", 10, "bold"), "fg": "#1f6feb", "anchor": "w", "width": 16}
+
+        for row, (label, var) in enumerate([
+            ("Χ ΕΓΣΑ87:",   self._ge_cam_x_var),
+            ("Υ ΕΓΣΑ87:",   self._ge_cam_y_var),
+            ("Longitude:",  self._ge_cam_lon_var),
+            ("Latitude:",   self._ge_cam_lat_var),
+        ]):
+            tk.Label(grid, text=label, **lbl_style).grid(row=row, column=0, sticky="w", pady=1)
+            tk.Label(grid, textvariable=var, **val_style).grid(row=row, column=1, sticky="w", pady=1)
+
+        ttk.Separator(win, orient="horizontal").pack(fill="x", padx=12, pady=8)
+
+        tk.Label(win, text="Το NetworkLink ανανεώνεται αυτόματα κάθε 1 δευτερόλεπτο.",
+                 font=("Segoe UI", 8), fg="#aaa").pack()
+
+        # Αποστολή σημείων αμέσως (polygon/points στη μνήμη)
+        self._ge_send_current_points()
+        # Άνοιγμα GE
+        self.ge_service.open_in_google_earth()
+        # FlyTo μετά από 4 δευτερόλεπτα — δίνουμε χρόνο στο GE να φορτώσει το NetworkLink
+        self.root.after(4000, self._ge_trigger_fly_to)
+        self.root.after(500, self._ge_update_connection_status)
+
+    def _ge_update_connection_status(self):
+        """Εμφανίζει πραγματική κατάσταση σύνδεσης βάσει του τελευταίου HTTP poll."""
+        if not self.ge_window or not self.ge_window.winfo_exists() or not self.ge_service:
+            return
+        import time
+        age = time.time() - self.ge_service.last_poll_time if self.ge_service.last_poll_time else None
+        if age is not None and age < 3.5:
+            self._ge_status_var.set(f"✔ Συνδεδεμένο · θύρα {self.ge_service.server.port} · τελευταία ενημέρωση πριν {age:.1f}s")
+            self._ge_status_label.config(fg="#2a6e3f", bg="#f0f8f0")
+        elif age is not None:
+            self._ge_status_var.set("⚠ Η σύνδεση δεν ανανεώνεται. Ελέγξτε το NetworkLink στο Google Earth.")
+            self._ge_status_label.config(fg="#9a5700", bg="#fff3df")
+        else:
+            self._ge_status_var.set("Αναμονή σύνδεσης από το Google Earth…")
+            self._ge_status_label.config(fg="#8a6d00", bg="#fff8df")
+        self.root.after(1000, self._ge_update_connection_status)
+
+    def _ge_trigger_fly_to(self):
+        """Επαναστέλνει το FlyTo μετά από καθυστέρηση ώστε το GE να έχει φορτώσει."""
+        if not self.ge_service or not self.egsa_points:
+            return
+        points = self.egsa_points
+        cx = sum(float(p.x) for p in points) / len(points)
+        cy = sum(float(p.y) for p in points) / len(points)
+        self.ge_service.send_point(cx, cy, "Κέντρο πολυγώνου", fly_to=True)
+        logger.info("FlyTo re-triggered after GE load delay")
+
+    def _ge_send_current_points(self):
+        """Στέλνει τα τρέχοντα egsa_points στο Google Earth.
+        ≥3 σημεία → polygon · 1-2 σημεία → individual saved points."""
+        if not self.ge_service:
+            return
+
+        points = self.egsa_points
+        if not points:
+            if hasattr(self, '_ge_pts_info_label'):
+                self._ge_pts_info_label.config(
+                    text="Δεν υπάρχουν σημεία. Κάνε πρώτα Υπολογισμό.", fg="#cc0000")
+            return
+
+        from services.google_earth_service import GEPoint, _egsa_to_wgs84
+
+        self.ge_service.clear_saved_points()
+
+        if len(points) >= 3:
+            # Μετατροπή σε GEPoint για τον polygon generator
+            ge_points = []
+            for p in points:
+                lon, lat = _egsa_to_wgs84(float(p.x), float(p.y))
+                ge_points.append(GEPoint(
+                    x=float(p.x), y=float(p.y),
+                    longitude=lon, latitude=lat,
+                    name=p.name
+                ))
+            self.ge_service.send_polygon(ge_points, "Πολύγωνο ΕΓΣΑ87")
+            # FlyTo στο κέντρο του πολυγώνου
+            cx = sum(float(p.x) for p in points) / len(points)
+            cy = sum(float(p.y) for p in points) / len(points)
+            self.ge_service.send_point(cx, cy, "Κέντρο πολυγώνου", fly_to=True)
+            msg = f"✔  Πολύγωνο {len(points)} κορυφών στάλθηκε στο Google Earth."
+        else:
+            # 1-2 σημεία → individual points
+            for p in points:
+                self.ge_service.add_saved_point(float(p.x), float(p.y), p.name)
+            first = points[0]
+            self.ge_service.send_point(float(first.x), float(first.y), first.name, fly_to=True)
+            msg = f"✔  {len(points)} σημεία στάλθηκαν στο Google Earth."
+
+        if hasattr(self, '_ge_pts_info_label'):
+            self._ge_pts_info_label.config(text=msg, fg="#2a6e3f")
+
+        logger.info(msg)
+
+    def _ge_clear_points(self):
+        """Καθαρισμός saved points από το Google Earth."""
+        if self.ge_service:
+            self.ge_service.clear_saved_points()
+        if hasattr(self, '_ge_pts_info_label'):
+            self._ge_pts_info_label.config(text="Τα σημεία καθαρίστηκαν.", fg="#888")
+
+    def _open_google_maps_browser(self):
+        """Ανοίγει τα τρέχοντα σημεία στο Google Maps σε browser.
+        Δείχνει pin στο πρώτο σημείο (το Google Maps URL API δεν υποστηρίζει
+        πολλαπλά custom markers χωρίς My Maps)."""
+        if not self.egsa_points:
+            messagebox.showwarning("Google Maps", "Δεν υπάρχουν σημεία. Κάνε πρώτα Υπολογισμό.")
+            return
+
+        first = self.egsa_points[0]
+        lon, lat = self.transformer.egsa_to_wgs84(first.x, first.y)
+
+        # ?q=lat,lon τοποθετεί πραγματικό pin marker στο σημείο
+        url = f"https://www.google.com/maps?q={lat:.8f},{lon:.8f}"
+
+        webbrowser.open(url)
+        logger.info(f"Google Maps browser opened (pin on '{first.name}'): {url}")
+
+    def _show_about(self):
+        """Εμφάνιση συνοπτικών πληροφοριών έκδοσης και τεχνικής ταυτότητας."""
+        win = tk.Toplevel(self.root)
+        win.title(f"Σχετικά με το EGSA Suite {APP_VERSION}")
+        win.geometry("600x520")
+        win.minsize(520, 420)
+
+        header = tk.Frame(win, bg=C["green_dark"])
+        header.pack(fill="x")
+        tk.Label(header, text="EGSA Suite", font=("Segoe UI", 17, "bold"),
+                 bg=C["green_dark"], fg=C["header_fg"]).pack(anchor="w", padx=18, pady=(14, 0))
+        tk.Label(header, text=f"Έκδοση {APP_VERSION} · Εργαλεία συντεταγμένων HATT / ΕΓΣΑ87",
+                 font=("Segoe UI", 9), bg=C["green_dark"], fg="#a8cdb2").pack(anchor="w", padx=18, pady=(2, 14))
+
+        frame = tk.Frame(win, bg=C["white"])
+        frame.pack(fill="both", expand=True)
+        scrollbar = tk.Scrollbar(frame)
+        scrollbar.pack(side="right", fill="y")
+        text = tk.Text(frame, wrap="word", padx=20, pady=18,
+                       yscrollcommand=scrollbar.set, font=("Segoe UI", 10),
+                       bg=C["white"], fg=C["text"], relief="flat", bd=0)
+        text.pack(fill="both", expand=True)
+        scrollbar.config(command=text.yview)
+
+        about_text = f"""ΣΚΟΠΟΣ
+
+Το EGSA Suite είναι εφαρμογή υποβοήθησης τεχνικών εργασιών για μετατροπή συντεταγμένων HATT σε ΕΓΣΑ87, διαχείριση κορυφών και ανταλλαγή γεωμετρίας με GIS, CAD και Google Earth.
+
+ΚΥΡΙΕΣ ΔΥΝΑΤΟΤΗΤΕΣ
+
+• Πολυωνυμικός μετασχηματισμός HATT → ΕΓΣΑ87 για 390 εγγραφές μετασχηματισμού (387 κωδικοί φύλλων).
+• Εισαγωγή σημείων απευθείας σε ΕΓΣΑ87.
+• Υπολογισμός αποστάσεων και εμβαδού.
+• Προβολή σε χάρτη, Google Maps και Google Earth Pro.
+• Εισαγωγή και εξαγωγή Shapefile και DXF.
+• Ανταλλαγή γεωμετρίας με GIS και CAD, με διατήρηση της σειράς των κορυφών.
+
+ΤΕΧΝΙΚΕΣ ΠΑΡΑΤΗΡΗΣΕΙΣ
+
+Οι εξαγωγές SHP χρησιμοποιούν ΕΓΣΑ87 / EPSG:2100. Τα DXF δεν διαθέτουν αξιόπιστη ενσωματωμένη πληροφορία CRS· κατά την εισαγωγή θεωρούνται συντεταγμένες ΕΓΣΑ87 σε μέτρα και απαιτείται έλεγχος από τον χρήστη.
+
+Η ακρίβεια της μετατροπής HATT εξαρτάται από τη σωστή επιλογή φύλλου χάρτη και από την ποιότητα των αρχικών δεδομένων. Το εργαλείο δεν αντικαθιστά επίσημη γεωδαιτική μελέτη, τοπογραφική αποτύπωση ή νομική αξιολόγηση.
+
+ΣΧΕΔΙΑΣΜΟΣ ΚΑΙ ΑΝΑΠΤΥΞΗ
+
+Δημήτρης Τσακνάκης · Δασολόγος
+Υλοποίηση και έλεγχος με τη συνδρομή σύγχρονων εργαλείων τεχνητής νοημοσύνης.
+
+ΛΟΓΙΣΜΙΚΟ ΑΝΟΙΧΤΟΥ ΚΩΔΙΚΑ
+
+Η ενσωμάτωση Google Earth KML NetworkLink, τοπικού HTTP server και camera tracking βασίζεται και προσαρμόζει στοιχεία του έργου egsa2ge του dasaki-greece, το οποίο διανέμεται με άδεια MIT. Η σχετική απόδοση πίστωσης και η άδεια διατηρούνται στο THIRD_PARTY_NOTICES.md. Το EGSA Suite διανέμεται ως λογισμικό ανοικτού κώδικα με άδεια MIT.
+"""
+        text.insert("1.0", about_text)
+        text.config(state="disabled")
+
+    def _show_help(self):
+        """Εμφάνιση καθαρών, προσανατολισμένων στη ροή εργασίας οδηγιών."""
+        win = tk.Toplevel(self.root)
+        win.title(f"Οδηγίες χρήσης · EGSA Suite {APP_VERSION}")
+        win.geometry("700x620")
+        win.minsize(600, 480)
+
+        header = tk.Frame(win, bg=C["green_dark"])
+        header.pack(fill="x")
+        tk.Label(header, text="Οδηγίες χρήσης", font=("Segoe UI", 15, "bold"),
+                 bg=C["green_dark"], fg=C["header_fg"]).pack(anchor="w", padx=18, pady=(13, 0))
+        tk.Label(header, text="Βασική ροή: εισαγωγή → υπολογισμός → έλεγχος → εξαγωγή",
+                 font=("Segoe UI", 9), bg=C["green_dark"], fg="#a8cdb2").pack(anchor="w", padx=18, pady=(2, 13))
+
+        frame = tk.Frame(win, bg=C["white"])
+        frame.pack(fill="both", expand=True)
+        scrollbar = tk.Scrollbar(frame)
+        scrollbar.pack(side="right", fill="y")
+        text = tk.Text(frame, wrap="word", padx=20, pady=18,
+                       yscrollcommand=scrollbar.set, font=("Segoe UI", 10),
+                       bg=C["white"], fg=C["text"], relief="flat", bd=0)
+        text.pack(fill="both", expand=True)
+        scrollbar.config(command=text.yview)
+
+        help_text = """1. ΕΠΙΛΟΓΗ ΛΕΙΤΟΥΡΓΙΑΣ
+
+Μετατροπή HATT → ΕΓΣΑ87
+Επίλεξε το σωστό φύλλο HATT από τη λίστα, όπου εμφανίζονται μαζί ο αριθμός φύλλου και η περιοχή. Έπειτα εισήγαγε τις τοπικές συντεταγμένες και πάτησε «Μετατροπή σε ΕΓΣΑ87».
+
+Δημιουργία πολυγώνου ΕΓΣΑ87
+Χρησιμοποίησέ την όταν οι συντεταγμένες είναι ήδη σε ΕΓΣΑ87 ή όταν εισάγονται από Shapefile ή DXF.
+
+2. ΜΟΡΦΗ ΕΙΣΟΔΟΥ
+
+Κάθε γραμμή περιέχει:
+  Όνομα  X  Y
+ή:
+  X  Y
+
+Χωρίς όνομα, η εφαρμογή δημιουργεί αυτόματα ονομασίες κορυφών. Υποστηρίζονται κενό, tab και ελληνικές/διεθνείς μορφές δεκαδικών. Έλεγξε πάντοτε τη σειρά X, Y.
+
+3. ΥΠΟΛΟΓΙΣΜΟΣ ΚΑΙ ΕΛΕΓΧΟΣ
+
+• 1 σημείο: σημειακή γεωμετρία.
+• 2 σημεία: ανοικτό τμήμα και απόσταση.
+• 3 ή περισσότερα: κλειστό πολύγωνο και εμβαδόν.
+
+Χρησιμοποίησε «Σχήμα & Εμβαδό» για οπτικό έλεγχο της σειράς των κορυφών, των πλευρών και του κλεισίματος πριν από κάθε επαγγελματική εξαγωγή.
+
+4. ΧΑΡΤΗΣ ΚΑΙ GOOGLE EARTH
+
+Η προβολή χάρτη μετατρέπει προσωρινά τα δεδομένα σε WGS84. Το Google Earth Live ανοίγει τοπικό KML NetworkLink, εμφανίζει τα σημεία ή το πολύγωνο και ενημερώνει τις συντεταγμένες του κέντρου οθόνης. Η σύνδεση λειτουργεί μόνο όσο παραμένει ανοικτό το EGSA Suite.
+
+5. ΕΙΣΑΓΩΓΗ SHAPEFILE
+
+Η εφαρμογή διαβάζει POINT, POLYLINE και POLYGON. Αν υπάρχουν πολλά features ή multipart γεωμετρίες, ζητά ρητή επιλογή feature/part και δεν τα ενώνει αυτόματα. Το συνοδευτικό .prj ελέγχεται μέσω pyproj. Δεν μετασχηματίζει αυτόματα άγνωστο CRS· επιβεβαίωσε ότι το αρχείο είναι ΕΓΣΑ87 / EPSG:2100.
+
+6. ΕΞΑΓΩΓΗ SHAPEFILE
+
+• 1 σημείο → POINT
+• 2 σημεία → POLYLINE
+• 3+ σημεία → POLYGON
+
+Δημιουργούνται τα συνοδευτικά .prj και .cpg. Πριν από εξαγωγή polygon ελέγχονται διπλότυπες κορυφές, μηδενικό εμβαδόν, αναμενόμενο εύρος ΕΓΣΑ87 και αυτοτομές.
+
+7. ΕΙΣΑΓΩΓΗ DXF
+
+Η εφαρμογή θεωρεί ότι το DXF περιέχει συντεταγμένες ΕΓΣΑ87 (EPSG:2100) σε μέτρα. Διαβάζονται LWPOLYLINE και 2D POLYLINE. Αν υπάρχουν περισσότερες από μία, εμφανίζεται παράθυρο επιλογής. Τα κοντινά TEXT/MTEXT μπορούν να χρησιμοποιηθούν ως ονόματα κορυφών· διαφορετικά δημιουργούνται αυτόματα.
+
+Αν οι δηλωμένες μονάδες ή το εύρος των τιμών φαίνονται ασυνήθιστα, εμφανίζεται σχετική προειδοποίηση πριν από την εισαγωγή.
+
+8. ΕΞΑΓΩΓΗ DXF
+
+Δημιουργούνται:
+• EGSA_BOUNDARY — ανοικτή ή κλειστή LWPOLYLINE.
+• EGSA_LABELS — ονόματα κορυφών ως TEXT.
+
+9. ΕΠΑΓΓΕΛΜΑΤΙΚΟΣ ΕΛΕΓΧΟΣ
+
+Πριν χρησιμοποιήσεις αποτέλεσμα σε διοικητική, τεχνική ή νομική διαδικασία:
+• επιβεβαίωσε το φύλλο HATT,
+• έλεγξε CRS και μονάδες,
+• επαλήθευσε τουλάχιστον ένα γνωστό σημείο,
+• έλεγξε οπτικά τη σειρά και το κλείσιμο των κορυφών,
+• κράτησε αντίγραφο των αρχικών δεδομένων.
+"""
+        text.insert("1.0", help_text)
+        text.config(state="disabled")
+
+
+# ==================== MAIN ====================
+
+def main():
+    """Entry point της εφαρμογής."""
+    root = tk.Tk()
+    root.withdraw()                      # κρύβουμε μέχρι να φορτώσει το UI
+    _update_splash(_splash, "Έτοιμο!", 1.0)
+    app = HATTEgsaApp(root)
+    _close_splash(_splash)               # κλείνει το splash
+    root.deiconify()                     # εμφανίζουμε το κύριο παράθυρο
+    root.lift()
+    root.focus_force()
+
+    try:
+        root.mainloop()
+    except KeyboardInterrupt:
+        logger.info("Application interrupted by user")
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        messagebox.showerror("Κρίσιμο Σφάλμα", 
+                           f"Η εφαρμογή αντιμετώπισε πρόβλημα:\n{e}")
+    finally:
+        cleanup_temp_files()
+        logger.info("Application closed")
+
+
+if __name__ == "__main__":
+    main()
