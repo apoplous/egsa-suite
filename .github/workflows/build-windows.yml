@@ -1,0 +1,85 @@
+name: build-windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "geotoolsgr.py"
+      - "hatt_coefficients.py"
+      - "services/**"
+      - "kml/**"
+      - "utils/**"
+      - "assets/**"
+      - "EGSA_Suite.spec"
+      - "version_info.txt"
+      - "requirements*.txt"
+      - "build_exe.bat"
+      - ".github/workflows/build-windows.yml"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements-build.txt
+
+      - name: Run regression tests
+        env:
+          EGSA_SUITE_NO_SPLASH: "1"
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python -m pytest -q
+
+      - name: Read application version
+        id: version
+        shell: pwsh
+        run: |
+          $m = Select-String -Path "geotoolsgr.py" -Pattern '^APP_VERSION\s*=\s*"([^"]+)"'
+          if (-not $m) { throw "APP_VERSION not found in geotoolsgr.py" }
+          $version = $m.Matches[0].Groups[1].Value
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Building EGSA Suite v$version"
+
+      - name: Build executable
+        run: python -m PyInstaller --noconfirm --clean EGSA_Suite.spec
+
+      - name: Stage Windows release
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $name = "EGSA_Suite_v${version}_Windows_x64"
+          $stage = Join-Path "release" $name
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item "dist/EGSA_Suite.exe" (Join-Path $stage "EGSA_Suite.exe")
+          Copy-Item "LICENSE" (Join-Path $stage "LICENSE.txt")
+          Copy-Item "THIRD_PARTY_NOTICES.md" $stage
+          Copy-Item "DATA_SOURCES.md" $stage
+          Copy-Item "licenses" $stage -Recurse
+          Compress-Archive -Path "$stage/*" -DestinationPath "release/$name.zip" -Force
+
+          $files = @("dist/EGSA_Suite.exe", "release/$name.zip")
+          $lines = foreach ($f in $files) {
+            $h = Get-FileHash $f -Algorithm SHA256
+            "$($h.Hash.ToLower())  $(Split-Path $f -Leaf)"
+          }
+          Set-Content -Path "release/SHA256SUMS.txt" -Value $lines -Encoding ascii
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: EGSA_Suite_v${{ steps.version.outputs.version }}_Windows_x64
+          path: |
+            release/EGSA_Suite_v${{ steps.version.outputs.version }}_Windows_x64.zip
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
