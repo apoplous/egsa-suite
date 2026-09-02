@@ -27,8 +27,8 @@ Expected output:
 
 ```text
 dist/EGSA_Suite.exe
-release/EGSA_Suite_v5.4.0-beta.2_Windows_x64/
-release/EGSA_Suite_v5.4.0-beta.2_Windows_x64.zip
+release/EGSA_Suite_v5.4.0-beta.3_Windows_x64/
+release/EGSA_Suite_v5.4.0-beta.3_Windows_x64.zip
 ```
 
 ## Before publishing a binary

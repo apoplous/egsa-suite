@@ -16,12 +16,12 @@ VSVersionInfo(
         [
           StringStruct(u'CompanyName', u'D.T.'),
           StringStruct(u'FileDescription', u'EGSA Suite - Coordinate Transformation Suite'),
-          StringStruct(u'FileVersion', u'5.4.0-beta.2'),
+          StringStruct(u'FileVersion', u'5.4.0-beta.3'),
           StringStruct(u'InternalName', u'EGSA_Suite'),
           StringStruct(u'LegalCopyright', u'Copyright (c) D.T. 2026'),
           StringStruct(u'OriginalFilename', u'EGSA_Suite.exe'),
           StringStruct(u'ProductName', u'EGSA Suite'),
-          StringStruct(u'ProductVersion', u'5.4.0-beta.2')
+          StringStruct(u'ProductVersion', u'5.4.0-beta.3')
         ]
       )
     ]),

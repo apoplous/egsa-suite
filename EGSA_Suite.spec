@@ -57,4 +57,5 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     version="version_info.txt",
+    icon="assets/egsa_suite.ico",
 )
