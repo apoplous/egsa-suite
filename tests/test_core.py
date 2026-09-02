@@ -177,3 +177,55 @@ def test_dxf_export_options_control_points_and_labels(tmp_path: Path):
     msp = doc.modelspace()
     assert len(msp.query("POINT")) == 3
     assert len(msp.query("TEXT")) == 3
+
+
+def test_official_hatt_coefficient_corrections_regression():
+    # Canonical values checked against the official OKXE / GYS / NTUA printed tables.
+    checks = [
+        ("ΑΓΡΙΝΙΟΝ", "B", 1, -0.0277237),
+        ("ΑΘΗΝΑ-ΕΛΕΥΣΙΣ", "B", 4, -3e-10),
+        ("ΑΘΗΝΑ-ΕΛΕΥΣΙΣ", "B", 5, -7.6e-10),
+        ("ΑΘΗΝΑ-ΕΛΕΥΣΙΣ (φ.119)", "B", 4, -3e-10),
+        ("ΑΘΗΝΑ-ΕΛΕΥΣΙΣ (φ.119)", "B", 5, -7.6e-10),
+        ("ΑΝΑΤΟΛΙΚΗ ΥΔΡΑ", "A", 0, 452679.92),
+        ("ΥΔΡΑ", "A", 0, 452679.92),
+        ("ΔΥΤ.ΗΡΑΚΛΕΙΑ", "A", 5, -3e-11),
+        ("ΙΟΣ", "A", 5, -3e-11),
+        ("ΣΧΟΙΝΟΥΣΑ", "A", 5, -3e-11),
+        ("ΕΡΥΘΡΑΙ", "B", 5, -2.36e-9),
+        ("ΕΧΙΝΑΔΕΣ", "B", 1, -0.032857),
+        ("ΝΗΣΟΣ ΑΤΟΚΟΣ", "B", 1, -0.032857),
+        ("ΖΑΚΥΝΘΟΣ", "B", 5, -6.94e-9),
+        ("ΘΕΡΜΗ", "B", 2, 0.9996386),
+        ("ΘΕΣΣΑΛΟΝΙΚΗ", "B", 2, 0.9996386),
+        ("ΚΙΛΚΙΣ", "B", 2, 0.9996386),
+        ("ΛΑΧΑΝΑΣ", "B", 2, 0.9996386),
+        ("ΚΑΝΔΗΛΑ", "A", 3, -1.53e-9),
+        ("ΝΕΜΕΑ", "A", 3, -1.53e-9),
+        ("ΛΑΜΙΑ", "A", 2, 0.0168119),
+        ("ΜΕΣΟΛΟΓΓΙΟΝ", "A", 3, -4.19e-9),
+        ("ΜΕΣΟΛΟΓΓΙΟΝ", "A", 4, 4.25e-9),
+        ("ΝΗΣΟΣ ΚΑΣΟΣ", "B", 3, -4.6e-10),
+        ("ΧΑΛΚΙΣ", "B", 4, -3e-10),
+        ("ΧΑΛΚΙΣ", "B", 5, -7.6e-10),
+    ]
+    for region, side, index, expected in checks:
+        assert HATT_COEFFICIENTS[region][side][index] == expected, (region, side, index)
+
+def test_hatt_quadratic_coefficients_have_plausible_magnitude():
+    # The official table contains legitimate terms up to about 4.93e-8. Values >= 1e-7 are a
+    # strong indication of a lost exponent digit (the exact failure mode found in the legacy XLS).
+    limit = 1e-7
+    for name, item in HATT_COEFFICIENTS.items():
+        for side in ("A", "B"):
+            for index in (3, 4, 5):
+                value = item[side][index]
+                assert abs(value) < limit, (name, side, index, value)
+
+
+def test_official_high_order_precision_regression():
+    assert HATT_COEFFICIENTS["ΑΚΡΑ ΠΑΞΙΜΑΔΙ"]["A"][4] == -40.85e-9
+    assert HATT_COEFFICIENTS["ΑΚΡΑ ΠΑΞΙΜΑΔΙ"]["B"][4] == 49.28e-9
+    assert HATT_COEFFICIENTS["ΒΑΡΘΟΛΟΜΙΟΝ"]["B"][5] == -12.05e-9
+    assert HATT_COEFFICIENTS["ΝΗΣΟΣ ΑΝΑΦΗ"]["A"][5] == -12.44e-9
+    assert HATT_COEFFICIENTS["ΝΗΣΟΙ ΠΑΞΟΙ"]["B"][5] == -14.85e-9

@@ -1,6 +1,6 @@
 """
 EGSA Suite – Coordinate Transformation Suite
-Version 5.4.0-beta.2 - Public Release Candidate
+Version 5.4.0-beta.3 - Public Release Candidate
 Author: D.T. 2026
 
 Μετατροπή συντεταγμένων από το τοπικό σύστημα HATT στο ΕΓΣΑ87
@@ -13,13 +13,29 @@ import tkinter as tk
 import sys, os
 from pathlib import Path
 
+def _early_icon_path() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS) / "assets" / "egsa_suite.ico"
+    return Path(__file__).resolve().parent / "assets" / "egsa_suite.ico"
+
+def apply_window_icon(window) -> None:
+    """Ορίζει το icon του παραθύρου, αν υπάρχει διαθέσιμο .ico αρχείο."""
+    try:
+        icon_path = _early_icon_path()
+        if icon_path.exists():
+            window.iconbitmap(default=str(icon_path))
+    except Exception:
+        pass
+
 def _show_splash() -> tk.Toplevel | None:
     """Δημιουργεί και εμφανίζει το splash window EGSA Suite."""
     try:
         root_hidden = tk.Tk()
         root_hidden.withdraw()
+        apply_window_icon(root_hidden)
 
         splash = tk.Toplevel(root_hidden)
+        apply_window_icon(splash)
         splash.overrideredirect(True)
         splash.configure(bg="#0f2d1a")
 
@@ -170,7 +186,7 @@ def _show_splash() -> tk.Toplevel | None:
                                           fill="#8fbc8f", outline="")
 
         # ── Version ──
-        c.create_text(TX, 248, text="v5.4.0-beta.2  ·  390 εγγραφές HATT  ·  2026",
+        c.create_text(TX, 248, text="v5.4.0-beta.3  ·  390 εγγραφές HATT  ·  2026",
                       font=("Segoe UI", 8), fill="#2a6e3f", anchor="w")
 
         splash.update()
@@ -263,6 +279,8 @@ else:
 
 if str(_BASE_DIR) not in sys.path:
     sys.path.insert(0, str(_BASE_DIR))
+
+ICON_PATH = _BASE_DIR / "assets" / "egsa_suite.ico"
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Google Earth integration
@@ -281,7 +299,7 @@ _GE_WORK_DIR = Path(_tempfile.gettempdir()) / "egsa_suite_ge"
 # ==================== CONFIGURATION ====================
 
 getcontext().prec = 34
-APP_VERSION = "5.4.0-beta.2"
+APP_VERSION = "5.4.0-beta.3"
 DISPLAY_DEC = Decimal("0.01")
 
 # ── Χρωματική παλέτα ─────────────────────────────────────────────────────────
@@ -325,14 +343,14 @@ except ImportError:
 # Προεπιλεγμένη περιοχή
 DEFAULT_REGION = "ΚΑΤΕΡΙΝΗ"
 
-# Η εγγραφή αυτή παρουσιάζει μεγάλη γεωγραφική ασυνέπεια στο διαθέσιμο dataset.
-# Δεν αλλάζουμε συντελεστές χωρίς πρωτογενή τεκμηρίωση· η UI εμφανίζει ρητή προειδοποίηση.
+# Η επίσημη έκδοση ΟΚΧΕ/ΓΥΣ/ΕΜΠ περιέχει αυτή την εγγραφή με τις ίδιες ασυνήθιστες
+# σταθερές. Δεν επινοούμε διόρθωση χωρίς authoritative corrigendum/control data.
 UNVERIFIED_HATT_REGIONS = {
     "ΝΗΣΟΣ ΜΕΓΙΣΤΗ(ΚΑΣΤΕΛΛΟΡΙΖΟ)": (
-        "Η συγκεκριμένη εγγραφή HATT παρουσιάζει σημαντική ασυνέπεια μεταξύ "
-        "του δηλωμένου κέντρου φύλλου και των σταθερών συντελεστών μετασχηματισμού. "
-        "Μην χρησιμοποιήσεις το αποτέλεσμα σε επαγγελματική/διοικητική εργασία χωρίς "
-        "ανεξάρτητη επαλήθευση από επίσημη γεωδαιτική πηγή."
+        "Οι συντελεστές της συγκεκριμένης εγγραφής επιβεβαιώνονται στην επίσημη έκδοση "
+        "ΟΚΧΕ/ΓΥΣ/ΕΜΠ, αλλά παρουσιάζουν σημαντική γεωγραφική ασυνέπεια σε σχέση με το "
+        "δηλωμένο κέντρο του φύλλου. Δεν γίνεται αυθαίρετη διόρθωση. Για επαγγελματική ή "
+        "διοικητική χρήση απαιτείται ανεξάρτητη επαλήθευση με κατάλληλα επίσημα/γνωστά δεδομένα."
     )
 }
 
@@ -1025,6 +1043,7 @@ class HATTEgsaApp:
         self.root = root
         self.root.title("EGSA Suite")
         self.root.configure(bg=C["bg"])
+        apply_window_icon(self.root)
         setup_styles(root)
         
         # Per-user settings (αποθηκεύονται στο AppData, όχι δίπλα στο portable EXE)
@@ -1619,7 +1638,7 @@ class HATTEgsaApp:
         current_region = self._region_display_to_name.get(display_value, display_value)
         if current_region in UNVERIFIED_HATT_REGIONS:
             if not messagebox.askyesno(
-                "Μη επαληθευμένη εγγραφή HATT",
+                "Ειδική προειδοποίηση HATT",
                 UNVERIFIED_HATT_REGIONS[current_region] + "\n\nΝα συνεχιστεί παρ' όλα αυτά;"
             ):
                 return
@@ -2442,7 +2461,7 @@ class HATTEgsaApp:
             self.region_code_lbl.config(text=self._region_info_text(region))
             if region in UNVERIFIED_HATT_REGIONS:
                 messagebox.showwarning(
-                    "Μη επαληθευμένη εγγραφή HATT",
+                    "Ειδική προειδοποίηση HATT",
                     UNVERIFIED_HATT_REGIONS[region]
                 )
             # Αν υπάρχουν ήδη αποτελέσματα, τα καθαρίζουμε (είναι για την παλιά περιοχή)
@@ -2751,7 +2770,7 @@ class HATTEgsaApp:
 
 Οι εξαγωγές SHP χρησιμοποιούν ΕΓΣΑ87 / EPSG:2100. Τα DXF δεν διαθέτουν αξιόπιστη ενσωματωμένη πληροφορία CRS· κατά την εισαγωγή θεωρούνται συντεταγμένες ΕΓΣΑ87 σε μέτρα και απαιτείται έλεγχος από τον χρήστη.
 
-Η ακρίβεια της μετατροπής HATT εξαρτάται από τη σωστή επιλογή φύλλου χάρτη και από την ποιότητα των αρχικών δεδομένων. Το εργαλείο δεν αντικαθιστά επίσημη γεωδαιτική μελέτη, τοπογραφική αποτύπωση ή νομική αξιολόγηση.
+Οι συντελεστές HATT βασίζονται στην επίσημη έκδοση ΟΚΧΕ/ΓΥΣ/ΕΜΠ. Η ίδια η έκδοση διευκρινίζει ότι τα πολυώνυμα προορίζονται για ένταξη χαρτογραφικών εργασιών και δεν παρέχουν γεωδαιτική ακρίβεια. Η ορθή χρήση εξαρτάται από τη σωστή επιλογή φύλλου και από την ταυτότητα/ποιότητα των αρχικών HATT δεδομένων, ιδίως ως προς την υλοποίηση μετά την τμηματική συνόρθωση των δικτύων μετά το 1963. Το εργαλείο δεν αντικαθιστά επίσημη γεωδαιτική μελέτη, τοπογραφική αποτύπωση ή νομική αξιολόγηση.
 
 ΣΧΕΔΙΑΣΜΟΣ ΚΑΙ ΑΝΑΠΤΥΞΗ
 

@@ -2,7 +2,7 @@
 setlocal EnableExtensions
 cd /d "%~dp0"
 
-set "VERSION=5.4.0-beta.2"
+set "VERSION=5.4.0-beta.3"
 set "RELEASE_NAME=EGSA_Suite_v%VERSION%_Windows_x64"
 
 title EGSA Suite %VERSION% - Build EXE
@@ -36,6 +36,10 @@ for %%F in (geotoolsgr.py hatt_coefficients.py EGSA_Suite.spec version_info.txt 
 )
 if not exist "assets\crosshair.png" (
     echo [ERROR] Missing assets\crosshair.png
+    goto :error
+)
+if not exist "assets\egsa_suite.ico" (
+    echo [ERROR] Missing assets\egsa_suite.ico
     goto :error
 )
 

@@ -1,5 +1,31 @@
 # Changelog
 
+## 5.4.0-beta.3 — 2026-09-02
+
+**Critical HATT coefficient data-correction release.** Users of beta.1/beta.2 should replace those
+builds with beta.3 before performing new HATT → EGSA87 conversions.
+
+### Fixed
+- Re-audited the HATT coefficient dataset against the official O.K.X.E. / ΓΥΣ / ΕΜΠ publication.
+- Corrected material transcription errors inherited from a legacy spreadsheet, including wrong
+  exponents, signs and individual digits in affected records. Confirmed corrections include
+  Agrinio, Athens-Elefsis/Thiva/Chalkida group, Anatoliki Ydra/Ydra, Dyt. Irakleia/Ios/Shoinousa,
+  Erythrai, Echinades/Atokos, Zakynthos, Thermi/Thessaloniki/Kilkis/Lahanas, Kandyla/Nemea, Lamia,
+  Mesolongi and Kasos.
+- Preserved the official printed precision of unusually large but legitimate quadratic terms for
+  Akra Paximadi/Gavrion (north), Vartholomio, Anafi and Paxoi.
+- The Kastellorizo constants remain unchanged: the anomalous values are confirmed by the official
+  publication itself, so the existing explicit warning remains the safe behaviour.
+
+### Verification / documentation
+- Added regression checks for canonical corrected coefficients.
+- Added a dataset-wide magnitude guard for second-degree terms to catch exponent-transcription
+  errors of the type found during this audit.
+- Updated `DATA_SOURCES.md` to use the official ΓΥΣ/ΟΚΧΕ/ΕΜΠ publication as the canonical source
+  and to document the official limitations of the transformation.
+- Updated application/build metadata to `v5.4.0-beta.3`.
+- Added a dedicated EGSA Suite application icon for the window, taskbar and packaged Windows EXE.
+
 ## 5.4.0-beta.2 — 2026-09-01
 
 Small usability release following the first public beta.
