@@ -48,6 +48,40 @@ def _validate_lat_lon(latitude: float, longitude: float) -> None:
         raise ValueError(f"longitude εκτός ορίων: {longitude}")
 
 
+def dms_components_to_decimal(degrees, minutes, seconds, hemisphere: str, axis: str) -> float:
+    """Convert numeric DMS fields to decimal degrees with strict validation."""
+    if axis not in ("lat", "lon"):
+        raise ValueError("axis must be lat or lon")
+
+    try:
+        deg = _number(str(degrees).strip())
+        minute = _number(str(minutes).strip())
+        second = _number(str(seconds).strip())
+    except (TypeError, ValueError):
+        raise ValueError("μοίρες, λεπτά και δευτερόλεπτα πρέπει να είναι αριθμοί")
+
+    hem = str(hemisphere).strip().upper()
+    allowed = ("N", "S") if axis == "lat" else ("E", "W")
+    if hem not in allowed:
+        shown = hem if hem else "—"
+        raise ValueError(f"μη έγκυρη διεύθυνση {shown} για {axis}")
+
+    if deg < 0:
+        raise ValueError("οι μοίρες γράφονται χωρίς πρόσημο· χρησιμοποίησε N/S/E/W")
+    if not 0 <= minute < 60:
+        raise ValueError("τα λεπτά πρέπει να είναι από 0 έως <60")
+    if not 0 <= second < 60:
+        raise ValueError("τα δευτερόλεπτα πρέπει να είναι από 0 έως <60")
+
+    max_deg = 90.0 if axis == "lat" else 180.0
+    if deg > max_deg or (deg == max_deg and (minute != 0 or second != 0)):
+        raise ValueError(f"οι μοίρες {axis} είναι εκτός ορίων")
+
+    value = deg + minute / 60.0 + second / 3600.0
+    if hem in ("S", "W"):
+        value = -value
+    return value
+
 def parse_dms_coordinate(text: str) -> Tuple[float, str]:
     """Parse one DMS coordinate and return (decimal_degrees, hemisphere)."""
     match = _DMS_COORD_RE.fullmatch(text.strip())
