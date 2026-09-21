@@ -267,6 +267,7 @@ from typing import List, Tuple, Optional
 from dataclasses import dataclass
 _update_splash(_splash, "Φόρτωση pyproj...", 0.60)
 from pyproj import Transformer, CRS
+from wgs84_utils import WGS84Point, format_wgs84_dms, parse_wgs84_points
 import tempfile as _tempfile
 
 _update_splash(_splash, "Φόρτωση Google Earth modules...", 0.75)
@@ -497,6 +498,7 @@ class CoordinateTransformer:
 
     def __init__(self):
         self.egsa_to_wgs = Transformer.from_crs("EPSG:2100", "EPSG:4326", always_xy=True)
+        self.wgs_to_egsa = Transformer.from_crs("EPSG:4326", "EPSG:2100", always_xy=True)
         self._coeffs = TRANSFORM_COEFFICIENTS  # τρέχοντες συντελεστές
 
     def set_region(self, region_name: str) -> None:
@@ -528,9 +530,14 @@ class CoordinateTransformer:
         return X, Y
 
     def egsa_to_wgs84(self, x: Decimal, y: Decimal) -> Tuple[float, float]:
-        """Μετατροπή από EGSA87 σε WGS84 (για χάρτες)."""
+        """Μετατροπή από EGSA87 σε WGS84 (longitude, latitude)."""
         lon, lat = self.egsa_to_wgs.transform(float(x), float(y))
         return lon, lat
+
+    def wgs84_to_egsa(self, longitude: float, latitude: float) -> Tuple[Decimal, Decimal]:
+        """Μετατροπή από WGS84 σε EGSA87."""
+        x, y = self.wgs_to_egsa.transform(float(longitude), float(latitude))
+        return Decimal(str(x)), Decimal(str(y))
 
 
 class PolygonCalculator:
@@ -1061,10 +1068,13 @@ class HATTEgsaApp:
         # Data storage
         self.HATT_points: List[Point] = []
         self.egsa_points: List[Point] = []
+        self.wgs84_points: List[WGS84Point] = []
         
         # UI Variables — δεσμεύονται ρητά στο σωστό root
         self.mode_var = tk.StringVar(master=root, value="HATT")
         self.map_style_var = tk.StringVar(master=root, value="ESRI Satellite")
+        self.wgs_direction_var = tk.StringVar(master=root, value="EGSA_TO_WGS")
+        self.wgs_format_var = tk.StringVar(master=root, value="decimal")
 
         # Camera tracking vars — αρχικοποίηση εδώ ώστε να υπάρχουν πάντα
         self._ge_cam_x_var   = tk.StringVar(master=root, value="—")
@@ -1106,6 +1116,9 @@ class HATTEgsaApp:
         
         # EGSA frame
         self.frame_egsa = self._create_egsa_frame()
+
+        # WGS84 frame
+        self.frame_wgs84 = self._create_wgs84_frame()
         
         # Footer
         self._create_footer()
@@ -1154,7 +1167,7 @@ class HATTEgsaApp:
         self.root.attributes("-topmost", self.always_on_top_var.get())
 
     def _create_mode_selection(self):
-        """Επιλογή λειτουργίας."""
+        """Επιλογή λειτουργίας ως διακριτές, καθαρές καρτέλες."""
         outer = tk.Frame(self.root, bg=C["bg"])
         outer.pack(fill="x", padx=12, pady=(10, 4))
 
@@ -1162,23 +1175,48 @@ class HATTEgsaApp:
                  font=("Segoe UI", 7, "bold"), fg=C["text_dim"],
                  bg=C["bg"]).pack(anchor="w")
 
-        radio_row = tk.Frame(outer, bg=C["bg"])
-        radio_row.pack(anchor="w", pady=(2, 0))
+        tab_row = tk.Frame(outer, bg=C["bg"])
+        tab_row.pack(fill="x", pady=(4, 0))
 
-        for txt, val in [("Μετατροπή HATT → ΕΓΣΑ87", "HATT"),
-                         ("Δημιουργία πολυγώνου ΕΓΣΑ87", "egsa")]:
-            tk.Radiobutton(
-                radio_row, text=txt,
-                variable=self.mode_var, value=val,
-                font=("Segoe UI", 9), bg=C["bg"],
-                fg=C["text"], selectcolor=C["bg"],
-                activebackground=C["bg"],
-                cursor="hand2"
-            ).pack(side="left", padx=(0, 20))
+        self._mode_buttons = {}
+        for txt, val in [
+            ("HATT → ΕΓΣΑ87", "HATT"),
+            ("Πολύγωνο ΕΓΣΑ87", "egsa"),
+            ("ΕΓΣΑ87 ↔ WGS84", "wgs84"),
+        ]:
+            btn = tk.Button(
+                tab_row, text=txt,
+                command=lambda v=val: self.mode_var.set(v),
+                font=("Segoe UI", 9, "bold"),
+                relief="flat", bd=0,
+                bg=C["white"], fg=C["green_dark"],
+                activebackground=C["green_light"], activeforeground=C["green_dark"],
+                highlightthickness=1, highlightbackground=C["border"],
+                padx=12, pady=7, cursor="hand2"
+            )
+            btn.pack(side="left", fill="x", expand=True, padx=(0, 6))
+            self._mode_buttons[val] = btn
 
         # Λεπτή γραμμή separator
         sep = tk.Frame(self.root, bg=C["border"], height=1)
         sep.pack(fill="x", padx=12, pady=(6, 0))
+
+    def _refresh_mode_tabs(self):
+        """Οπτική ένδειξη της ενεργής κύριας καρτέλας."""
+        selected = self.mode_var.get()
+        for value, button in self._mode_buttons.items():
+            if value == selected:
+                button.config(
+                    bg=C["green_dark"], fg=C["white"],
+                    activebackground=C["green_mid"], activeforeground=C["white"],
+                    highlightbackground=C["green_dark"]
+                )
+            else:
+                button.config(
+                    bg=C["white"], fg=C["green_dark"],
+                    activebackground=C["green_light"], activeforeground=C["green_dark"],
+                    highlightbackground=C["border"]
+                )
     
     def _create_HATT_frame(self) -> tk.Frame:
         """Δημιουργία HATT mode frame."""
@@ -1594,6 +1632,275 @@ class HATTEgsaApp:
 
         return frame
 
+    def _create_wgs84_frame(self) -> tk.Frame:
+        """Τρίτη καρτέλα: αμφίδρομη μετατροπή ΕΓΣΑ87 ↔ WGS84."""
+        frame = tk.Frame(self.root, bg=C["bg"])
+        PAD = {"padx": 12}
+
+        # ── Direction / WGS84 format ─────────────────────────────────────────
+        options_outer = tk.Frame(frame, bg=C["bg"])
+        options_outer.pack(fill="x", pady=(10, 4), **PAD)
+
+        tk.Label(options_outer, text="ΚΑΤΕΥΘΥΝΣΗ ΜΕΤΑΤΡΟΠΗΣ",
+                 font=("Segoe UI", 7, "bold"), fg=C["text_dim"],
+                 bg=C["bg"]).pack(anchor="w")
+
+        direction_row = tk.Frame(options_outer, bg=C["bg"])
+        direction_row.pack(fill="x", pady=(3, 7))
+        self._wgs_direction_buttons = {}
+        for text, value in [
+            ("ΕΓΣΑ87 → WGS84", "EGSA_TO_WGS"),
+            ("WGS84 → ΕΓΣΑ87", "WGS_TO_EGSA"),
+        ]:
+            button = tk.Button(
+                direction_row, text=text,
+                command=lambda v=value: self._set_wgs_direction(v),
+                font=("Segoe UI", 8, "bold"), relief="flat", bd=0,
+                bg=C["white"], fg=C["green_dark"],
+                activebackground=C["green_light"], activeforeground=C["green_dark"],
+                highlightthickness=1, highlightbackground=C["border"],
+                padx=12, pady=5, cursor="hand2"
+            )
+            button.pack(side="left", fill="x", expand=True, padx=(0, 6))
+            self._wgs_direction_buttons[value] = button
+
+        format_row = tk.Frame(options_outer, bg=C["bg"])
+        format_row.pack(fill="x")
+        tk.Label(format_row, text="Μορφή WGS84:",
+                 font=("Segoe UI", 8), fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(0, 6))
+        for text, value in [
+            ("Δεκαδικές μοίρες", "decimal"),
+            ("Μοίρες / λεπτά / δευτερόλεπτα", "dms"),
+        ]:
+            tk.Radiobutton(
+                format_row, text=text,
+                variable=self.wgs_format_var, value=value,
+                command=self._update_wgs84_ui,
+                font=("Segoe UI", 8), bg=C["bg"], fg=C["text"],
+                selectcolor=C["bg"], activebackground=C["bg"],
+                cursor="hand2"
+            ).pack(side="left", padx=(0, 12))
+
+        tk.Frame(frame, bg=C["border"], height=1).pack(fill="x", padx=12, pady=(6, 0))
+
+        # ── Input ─────────────────────────────────────────────────────────────
+        inp_outer = tk.Frame(frame, bg=C["bg"])
+        inp_outer.pack(fill="x", pady=(10, 4), **PAD)
+
+        hdr = tk.Frame(inp_outer, bg=C["bg"])
+        hdr.pack(fill="x")
+        self.wgs_input_title_var = tk.StringVar(master=self.root)
+        self.wgs_input_hint_var = tk.StringVar(master=self.root)
+        tk.Label(hdr, textvariable=self.wgs_input_title_var,
+                 font=("Segoe UI", 9, "bold"), fg=C["text"],
+                 bg=C["bg"]).pack(side="left")
+        tk.Label(hdr, textvariable=self.wgs_input_hint_var,
+                 font=("Segoe UI", 8), fg=C["text_dim"],
+                 bg=C["bg"]).pack(side="left", padx=(8, 0))
+
+        self.wgs_input = tk.Text(
+            frame, width=48, height=6,
+            font=("Consolas", 9),
+            bg=C["input_bg"], fg=C["text"],
+            relief="flat", bd=0,
+            insertbackground=C["green_mid"],
+            selectbackground=C["accent"],
+            highlightthickness=1,
+            highlightbackground=C["border"],
+            highlightcolor=C["green_mid"],
+            padx=8, pady=6
+        )
+        self.wgs_input.pack(fill="x", padx=12)
+        add_context_menu(self.wgs_input)
+
+        btn_row = tk.Frame(frame, bg=C["bg"])
+        btn_row.pack(pady=(5, 0), **PAD)
+        for txt, cmd in [
+            ("📋  Επικόλληση", lambda: self._paste_to(self.wgs_input)),
+            ("✕  Καθαρισμός", self._clear_wgs84_fields),
+        ]:
+            tk.Button(btn_row, text=txt, command=cmd,
+                      font=("Segoe UI", 8), relief="flat", bd=0,
+                      bg=C["bg"], fg=C["text_mid"],
+                      activebackground=C["border"],
+                      padx=10, pady=4, cursor="hand2"
+                      ).pack(side="left", padx=(0, 6))
+
+        tk.Frame(frame, bg=C["border"], height=1).pack(fill="x", padx=12, pady=(8, 0))
+
+        calc_frame = tk.Frame(frame, bg=C["bg"])
+        calc_frame.pack(fill="x", padx=12, pady=8)
+        self.wgs_calc_text_var = tk.StringVar(master=self.root)
+        tk.Button(
+            calc_frame, textvariable=self.wgs_calc_text_var,
+            command=self._calculate_wgs84,
+            font=("Segoe UI", 10, "bold"),
+            fg=C["white"], bg=C["blue_btn"],
+            activebackground="#1976d2", activeforeground=C["white"],
+            relief="flat", bd=0, pady=8, cursor="hand2"
+        ).pack(fill="x")
+
+        # ── Output ────────────────────────────────────────────────────────────
+        out_hdr = tk.Frame(frame, bg=C["bg"])
+        out_hdr.pack(fill="x", pady=(4, 2), **PAD)
+        self.wgs_output_title_var = tk.StringVar(master=self.root)
+        tk.Label(out_hdr, textvariable=self.wgs_output_title_var,
+                 font=("Segoe UI", 9, "bold"), fg=C["text"],
+                 bg=C["bg"]).pack(side="left")
+        tk.Button(out_hdr, text="📄 Αντιγραφή",
+                  font=("Segoe UI", 8), relief="flat", bd=0,
+                  bg=C["bg"], fg=C["text_dim"],
+                  activebackground=C["border"],
+                  padx=8, pady=2, cursor="hand2",
+                  command=lambda: self._copy_text_to_clipboard(self.wgs_output)
+                  ).pack(side="right")
+
+        self.wgs_output = tk.Text(
+            frame, width=48, height=8,
+            font=("Consolas", 9),
+            bg=C["output_bg"], fg=C["text"],
+            state="disabled", relief="flat", bd=0,
+            highlightthickness=1,
+            highlightbackground=C["border"],
+            highlightcolor=C["border"],
+            padx=8, pady=6
+        )
+        self.wgs_output.pack(fill="x", padx=12)
+        add_context_menu(self.wgs_output)
+
+        self.lbl_wgs_area = tk.Label(frame, fg=C["green_mid"], bg=C["bg"],
+                                     font=("Segoe UI", 8))
+
+        if GE_AVAILABLE:
+            ge_frame = tk.Frame(frame, bg=C["bg"])
+            ge_frame.pack(fill="x", padx=12, pady=(10, 0))
+            tk.Button(
+                ge_frame, text="🌍  Άνοιγμα στο Google Earth",
+                command=self._open_google_earth_window,
+                font=("Segoe UI", 9, "bold"),
+                fg=C["white"], bg=C["green_mid"],
+                activebackground="#3a8e5f", activeforeground=C["white"],
+                relief="flat", bd=0, pady=7, cursor="hand2"
+            ).pack(fill="x")
+
+        # ── Same geometry actions, always backed by EGSA87 internally ─────────
+        tk.Frame(frame, bg=C["border"], height=1).pack(fill="x", padx=12, pady=(12, 0))
+        act_outer = tk.Frame(frame, bg=C["bg"])
+        act_outer.pack(fill="x", padx=12, pady=(8, 10))
+
+        tk.Label(act_outer, text="ΠΡΟΒΟΛΗ · ΕΙΣΑΓΩΓΗ · ΕΞΑΓΩΓΗ",
+                 font=("Segoe UI", 7, "bold"), fg=C["text_dim"],
+                 bg=C["bg"]).pack(anchor="w", pady=(0, 6))
+
+        row1 = tk.Frame(act_outer, bg=C["bg"])
+        row1.pack(fill="x", pady=(0, 4))
+        tk.Button(row1, text="🗺  Προβολή σε Χάρτη",
+                  command=self._preview_map,
+                  font=("Segoe UI", 9), relief="flat", bd=0,
+                  bg=C["green_light"], fg=C["green_dark"],
+                  activebackground=C["accent"],
+                  padx=10, pady=5, cursor="hand2"
+                  ).pack(side="left", padx=(0, 6))
+        style_box = ttk.Combobox(
+            row1, textvariable=self.map_style_var,
+            values=["OpenStreetMap", "ESRI Satellite", "Google Maps"],
+            width=14, state="readonly", style="Modern.TCombobox"
+        )
+        style_box.set("ESRI Satellite")
+        style_box.pack(side="left")
+
+        row2 = tk.Frame(act_outer, bg=C["bg"])
+        row2.pack(fill="x", pady=(0, 4))
+        tk.Button(row2, text="📐  Σχήμα & Εμβαδό",
+                  command=self._preview_polygon,
+                  font=("Segoe UI", 8), relief="flat", bd=0,
+                  bg=C["green_light"], fg=C["green_dark"],
+                  activebackground=C["accent"],
+                  padx=8, pady=5, cursor="hand2"
+                  ).pack(side="left")
+
+        row3 = tk.Frame(act_outer, bg=C["bg"])
+        row3.pack(fill="x", pady=(2, 4))
+        tk.Label(row3, text="Εισαγωγή:", font=("Segoe UI", 8),
+                 fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(0, 6))
+        for txt, cmd in [("Shapefile", self._import_shp), ("DXF", self._import_dxf)]:
+            tk.Button(row3, text=txt, command=cmd,
+                      font=("Segoe UI", 8), relief="flat", bd=0,
+                      bg=C["input_bg"], fg=C["green_dark"],
+                      highlightthickness=1, highlightbackground=C["border"],
+                      activebackground=C["green_light"],
+                      padx=12, pady=4, cursor="hand2"
+                      ).pack(side="left", padx=(0, 5))
+
+        row4 = tk.Frame(act_outer, bg=C["bg"])
+        row4.pack(fill="x", pady=(2, 0))
+        tk.Label(row4, text="Εξαγωγή:", font=("Segoe UI", 8),
+                 fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(0, 6))
+        for txt, cmd in [("Shapefile", self._export_shapefile), ("DXF", self._export_dxf)]:
+            tk.Button(row4, text=txt, command=cmd,
+                      font=("Segoe UI", 8), relief="flat", bd=0,
+                      bg=C["green_light"], fg=C["green_dark"],
+                      activebackground=C["accent"],
+                      padx=12, pady=4, cursor="hand2"
+                      ).pack(side="left", padx=(0, 5))
+
+        self._update_wgs84_ui()
+        return frame
+
+    def _set_wgs_direction(self, value: str) -> None:
+        self.wgs_direction_var.set(value)
+        self._update_wgs84_ui()
+
+    def _refresh_wgs_direction_buttons(self) -> None:
+        selected = self.wgs_direction_var.get()
+        for value, button in self._wgs_direction_buttons.items():
+            if value == selected:
+                button.config(
+                    bg=C["green_mid"], fg=C["white"],
+                    activebackground=C["green_dark"], activeforeground=C["white"],
+                    highlightbackground=C["green_mid"]
+                )
+            else:
+                button.config(
+                    bg=C["white"], fg=C["green_dark"],
+                    activebackground=C["green_light"], activeforeground=C["green_dark"],
+                    highlightbackground=C["border"]
+                )
+
+    def _update_wgs84_ui(self) -> None:
+        """Ενημερώνει τίτλους/οδηγίες χωρίς να αλλάζει τα δεδομένα εισόδου."""
+        self._refresh_wgs_direction_buttons()
+        direction = self.wgs_direction_var.get()
+        fmt = self.wgs_format_var.get()
+
+        if direction == "EGSA_TO_WGS":
+            self.wgs_input_title_var.set("Σημεία εισόδου σε ΕΓΣΑ87")
+            self.wgs_input_hint_var.set("(Όνομα X Y) ή (X Y)")
+            self.wgs_calc_text_var.set("  ➜   Μετατροπή σε WGS84  ")
+            self.wgs_output_title_var.set(
+                "Αποτελέσματα WGS84 — " +
+                ("δεκαδικές μοίρες (Latitude, Longitude)" if fmt == "decimal"
+                 else "μοίρες / λεπτά / δευτερόλεπτα")
+            )
+        else:
+            self.wgs_input_title_var.set("Σημεία εισόδου σε WGS84")
+            if fmt == "decimal":
+                self.wgs_input_hint_var.set("(Όνομα Latitude Longitude) — π.χ. A 40.272123 22.503456")
+            else:
+                self.wgs_input_hint_var.set("π.χ. A 40°16′19.643″N 22°30′12.442″E")
+            self.wgs_calc_text_var.set("  ➜   Μετατροπή σε ΕΓΣΑ87  ")
+            self.wgs_output_title_var.set("Αποτελέσματα σε ΕΓΣΑ87")
+
+    def _clear_wgs84_fields(self) -> None:
+        self.wgs_input.delete("1.0", tk.END)
+        self.wgs_output.config(state="normal")
+        self.wgs_output.delete("1.0", tk.END)
+        self.wgs_output.config(state="disabled")
+        self.HATT_points = []
+        self.egsa_points = []
+        self.wgs84_points = []
+        self._clear_area_labels()
+
     def _create_footer(self):
         """Footer."""
         footer = tk.Frame(self.root, bg=C["bg"], height=20)
@@ -1605,15 +1912,22 @@ class HATTEgsaApp:
                  ).pack(side="right", padx=10, pady=3)
 
     def _switch_mode(self):
-        """Εναλλαγή μεταξύ HATT και EGSA mode."""
+        """Εναλλαγή μεταξύ HATT, EGSA και WGS84 mode."""
         self._clear_area_labels()
-        
-        if self.mode_var.get() == "HATT":
-            self.frame_egsa.pack_forget()
+        self._refresh_mode_tabs()
+
+        self.frame_HATT.pack_forget()
+        self.frame_egsa.pack_forget()
+        self.frame_wgs84.pack_forget()
+
+        mode = self.mode_var.get()
+        if mode == "HATT":
             self.frame_HATT.pack(fill="x", pady=5)
-        else:
-            self.frame_HATT.pack_forget()
+        elif mode == "egsa":
             self.frame_egsa.pack(fill="x", pady=5)
+        else:
+            self.frame_wgs84.pack(fill="x", pady=5)
+            self._update_wgs84_ui()
     
     def _paste_to(self, widget: tk.Text):
         """Επικόλληση από clipboard."""
@@ -1706,7 +2020,85 @@ class HATTEgsaApp:
         self._update_area_labels_egsa()
         
         logger.info(f"Processed {len(self.egsa_points)} EGSA87 points")
-    
+
+    def _calculate_wgs84(self):
+        """Αμφίδρομη μετατροπή ΕΓΣΑ87 ↔ WGS84 με κοινό EGSA geometry state."""
+        text = self.wgs_input.get("1.0", tk.END).strip()
+        direction = self.wgs_direction_var.get()
+        fmt = self.wgs_format_var.get()
+
+        self.HATT_points = []
+        self.egsa_points = []
+        self.wgs84_points = []
+
+        if direction == "EGSA_TO_WGS":
+            points, errors = self.parser.parse_points(text)
+            if errors:
+                messagebox.showwarning("Προειδοποίηση", "Κάποια σημεία αγνοήθηκαν:\n" + "\n".join(errors[:5]))
+            if not points:
+                messagebox.showerror(MESSAGES['error_title'], "Δεν βρέθηκαν έγκυρα σημεία ΕΓΣΑ87.")
+                return
+
+            self.egsa_points = points
+            for point in points:
+                lon, lat = self.transformer.egsa_to_wgs84(point.x, point.y)
+                self.wgs84_points.append(WGS84Point(point.name, lat, lon))
+
+            output_lines = []
+            for point in self.wgs84_points:
+                if fmt == "dms":
+                    lat_text = format_wgs84_dms(point.latitude, "lat")
+                    lon_text = format_wgs84_dms(point.longitude, "lon")
+                else:
+                    lat_text = f"{point.latitude:.8f}"
+                    lon_text = f"{point.longitude:.8f}"
+                output_lines.append(f"{point.name}\t{lat_text}\t{lon_text}")
+        else:
+            wgs_points, errors = parse_wgs84_points(text, fmt)
+            if errors:
+                messagebox.showwarning("Προειδοποίηση", "Κάποια σημεία αγνοήθηκαν:\n" + "\n".join(errors[:5]))
+            if not wgs_points:
+                messagebox.showerror(MESSAGES['error_title'], "Δεν βρέθηκαν έγκυρα σημεία WGS84.")
+                return
+
+            self.wgs84_points = wgs_points
+            for point in wgs_points:
+                x, y = self.transformer.wgs84_to_egsa(point.longitude, point.latitude)
+                self.egsa_points.append(Point(name=point.name, x=x, y=y))
+
+            output_lines = [
+                f"{point.name}\t{format_display(point.x)}\t{format_display(point.y)}"
+                for point in self.egsa_points
+            ]
+
+        self.wgs_output.config(state="normal")
+        self.wgs_output.delete("1.0", tk.END)
+        self.wgs_output.insert("1.0", "\n".join(output_lines) + "\n")
+        self.wgs_output.config(state="disabled")
+        self._update_area_labels_wgs84()
+        logger.info(
+            "Processed %s points in WGS84 tab (%s, %s)",
+            len(self.egsa_points), direction, fmt
+        )
+
+    def _update_area_labels_wgs84(self):
+        """Εμβαδόν του WGS84 workflow υπολογισμένο σωστά στο επίπεδο ΕΓΣΑ87."""
+        self._clear_area_labels()
+        if len(self.egsa_points) < 3:
+            return
+        if self.calculator.has_self_intersections(self.egsa_points):
+            self.lbl_wgs_area.config(
+                text="Προειδοποίηση: το πολύγωνο παρουσιάζει αυτοτομή — το εμβαδόν δεν υπολογίζεται.",
+                fg="#b42318"
+            )
+        else:
+            area = self.calculator.calculate_area(self.egsa_points).quantize(DISPLAY_DEC)
+            self.lbl_wgs_area.config(
+                text=f"Εμβαδόν (υπολογισμένο σε ΕΓΣΑ87): {format_display(area)} m²",
+                fg=C["green_mid"]
+            )
+        self.lbl_wgs_area.pack(anchor="w")
+
     def _update_area_labels_HATT(self):
         """Ενημέρωση labels εμβαδού για HATT mode με έλεγχο μη έγκυρης γεωμετρίας."""
         self._clear_area_labels()
@@ -1768,10 +2160,12 @@ class HATTEgsaApp:
         self.lbl_egsa_area.config(fg=C["green_mid"])
         self.lbl_diff.config(fg=C["text_mid"])
         self.lbl_egsa_only.config(fg=C["green_mid"])
+        self.lbl_wgs_area.config(fg=C["green_mid"])
         self.lbl_HATT_area.pack_forget()
         self.lbl_egsa_area.pack_forget()
         self.lbl_diff.pack_forget()
         self.lbl_egsa_only.pack_forget()
+        self.lbl_wgs_area.pack_forget()
     
     def _preview_map(self):
         """Προβολή σημείων/πολυγώνου σε διαδραστικό χάρτη (Folium)."""
@@ -2251,15 +2645,22 @@ class HATTEgsaApp:
                 return
 
             lines = "\n".join(f"{name} {x:.3f} {y:.3f}" for name, x, y in named_points)
-            self.mode_var.set("egsa")
-            self._switch_mode()
-            self.egsa_input.delete("1.0", tk.END)
-            self.egsa_input.insert("1.0", lines)
+            if self.mode_var.get() == "wgs84":
+                self.wgs_direction_var.set("EGSA_TO_WGS")
+                self._update_wgs84_ui()
+                self.wgs_input.delete("1.0", tk.END)
+                self.wgs_input.insert("1.0", lines)
+                next_step = "Πάτησε «Μετατροπή σε WGS84» για μετατροπή και έλεγχο."
+            else:
+                self.mode_var.set("egsa")
+                self._switch_mode()
+                self.egsa_input.delete("1.0", tk.END)
+                self.egsa_input.insert("1.0", lines)
+                next_step = "Πάτησε «Επεξεργασία Πολυγώνου» για υπολογισμό και έλεγχο."
 
             messagebox.showinfo(
                 "Εισαγωγή DXF",
-                f"Εισήχθησαν {len(named_points)} κορυφές.\n"
-                "Πάτησε «Επεξεργασία Πολυγώνου» για υπολογισμό και έλεγχο."
+                f"Εισήχθησαν {len(named_points)} κορυφές.\n" + next_step
             )
             logger.info(f"DXF imported: {dxf_path}, vertices={len(named_points)}")
 
@@ -2391,15 +2792,23 @@ class HATTEgsaApp:
                 return
 
             lines = "\n".join(f"{n} {x:.3f} {y:.3f}" for n, x, y in extracted)
-            self.mode_var.set("egsa")
-            self._switch_mode()
-            self.egsa_input.delete("1.0", tk.END)
-            self.egsa_input.insert("1.0", lines)
+            if self.mode_var.get() == "wgs84":
+                self.wgs_direction_var.set("EGSA_TO_WGS")
+                self._update_wgs84_ui()
+                self.wgs_input.delete("1.0", tk.END)
+                self.wgs_input.insert("1.0", lines)
+                next_step = "Πάτησε «Μετατροπή σε WGS84» για μετατροπή και έλεγχο."
+            else:
+                self.mode_var.set("egsa")
+                self._switch_mode()
+                self.egsa_input.delete("1.0", tk.END)
+                self.egsa_input.insert("1.0", lines)
+                next_step = "Πάτησε «Επεξεργασία Πολυγώνου» για υπολογισμό και έλεγχο."
 
             messagebox.showinfo(
                 "Εισαγωγή Shapefile",
                 f"Εισήχθησαν {len(extracted)} σημεία από το επιλεγμένο "
-                f"{selected['geometry_type']}.\nΠάτησε «Επεξεργασία Πολυγώνου» για υπολογισμό και έλεγχο."
+                f"{selected['geometry_type']}.\n" + next_step
             )
             logger.info(
                 "Shapefile imported: %s feature=%s part=%s vertices=%s",
