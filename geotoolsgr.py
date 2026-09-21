@@ -267,7 +267,7 @@ from typing import List, Tuple, Optional
 from dataclasses import dataclass
 _update_splash(_splash, "Φόρτωση pyproj...", 0.60)
 from pyproj import Transformer, CRS
-from wgs84_utils import WGS84Point, format_wgs84_dms, parse_wgs84_points
+from wgs84_utils import WGS84Point, dms_components_to_decimal, format_wgs84_dms, parse_wgs84_points
 import tempfile as _tempfile
 
 _update_splash(_splash, "Φόρτωση Google Earth modules...", 0.75)
@@ -1125,6 +1125,7 @@ class HATTEgsaApp:
         
         # Initialize view
         self._switch_mode()
+        self._stabilize_main_window_size()
         self.mode_var.trace_add("write", lambda *args: self._switch_mode())
     
     def _create_top_frame(self):
@@ -1698,8 +1699,15 @@ class HATTEgsaApp:
                  font=("Segoe UI", 8), fg=C["text_dim"],
                  bg=C["bg"]).pack(side="left", padx=(8, 0))
 
+        # Το text input παραμένει για ΕΓΣΑ87 και decimal WGS84. Στη χειροκίνητη
+        # είσοδο DMS εμφανίζεται αριθμητικός πίνακας ώστε ο χρήστης να μην
+        # χρειάζεται να πληκτρολογεί σύμβολα ° ′ ″.
+        self.wgs_input_host = tk.Frame(frame, bg=C["bg"])
+        self.wgs_input_host.pack(fill="x", padx=12)
+
+        self.wgs_text_input_frame = tk.Frame(self.wgs_input_host, bg=C["bg"])
         self.wgs_input = tk.Text(
-            frame, width=48, height=6,
+            self.wgs_text_input_frame, width=48, height=6,
             font=("Consolas", 9),
             bg=C["input_bg"], fg=C["text"],
             relief="flat", bd=0,
@@ -1710,21 +1718,89 @@ class HATTEgsaApp:
             highlightcolor=C["green_mid"],
             padx=8, pady=6
         )
-        self.wgs_input.pack(fill="x", padx=12)
+        self.wgs_input.pack(fill="x")
         add_context_menu(self.wgs_input)
 
-        btn_row = tk.Frame(frame, bg=C["bg"])
-        btn_row.pack(pady=(5, 0), **PAD)
+        self.wgs_dms_input_frame = tk.Frame(self.wgs_input_host, bg=C["bg"])
+
+        dms_header = tk.Frame(self.wgs_dms_input_frame, bg=C["bg"])
+        dms_header.pack(fill="x", pady=(0, 3))
+        headers = [
+            ("Σημείο", 7), ("Lat °", 5), ("′", 4), ("″", 8), ("N/S", 4),
+            ("Lon °", 5), ("′", 4), ("″", 8), ("E/W", 4),
+        ]
+        for col, (label, width) in enumerate(headers):
+            tk.Label(
+                dms_header, text=label, width=width,
+                font=("Segoe UI", 7, "bold"), fg=C["text_dim"], bg=C["bg"],
+                anchor="center"
+            ).grid(row=0, column=col, padx=1)
+
+        dms_body_outer = tk.Frame(
+            self.wgs_dms_input_frame, bg=C["white"],
+            highlightthickness=1, highlightbackground=C["border"]
+        )
+        dms_body_outer.pack(fill="x")
+
+        self.wgs_dms_canvas = tk.Canvas(
+            dms_body_outer, height=130, bg=C["white"],
+            highlightthickness=0, bd=0
+        )
+        dms_scroll = tk.Scrollbar(
+            dms_body_outer, orient="vertical",
+            command=self.wgs_dms_canvas.yview
+        )
+        self.wgs_dms_canvas.configure(yscrollcommand=dms_scroll.set)
+        self.wgs_dms_canvas.pack(side="left", fill="both", expand=True)
+        dms_scroll.pack(side="right", fill="y")
+
+        self.wgs_dms_inner = tk.Frame(self.wgs_dms_canvas, bg=C["white"])
+        self._wgs_dms_window = self.wgs_dms_canvas.create_window(
+            (0, 0), window=self.wgs_dms_inner, anchor="nw"
+        )
+        self.wgs_dms_inner.bind(
+            "<Configure>",
+            lambda _e: self.wgs_dms_canvas.configure(
+                scrollregion=self.wgs_dms_canvas.bbox("all")
+            )
+        )
+        self.wgs_dms_canvas.bind(
+            "<Configure>",
+            lambda e: self.wgs_dms_canvas.itemconfigure(
+                self._wgs_dms_window, width=e.width
+            )
+        )
+
+        self._wgs_dms_rows = []
+        for _ in range(4):
+            self._add_wgs_dms_row()
+
+        self.wgs_text_controls = tk.Frame(frame, bg=C["bg"])
+        self.wgs_text_controls.pack(pady=(5, 0), **PAD)
         for txt, cmd in [
             ("📋  Επικόλληση", lambda: self._paste_to(self.wgs_input)),
             ("✕  Καθαρισμός", self._clear_wgs84_fields),
         ]:
-            tk.Button(btn_row, text=txt, command=cmd,
+            tk.Button(self.wgs_text_controls, text=txt, command=cmd,
                       font=("Segoe UI", 8), relief="flat", bd=0,
                       bg=C["bg"], fg=C["text_mid"],
                       activebackground=C["border"],
                       padx=10, pady=4, cursor="hand2"
                       ).pack(side="left", padx=(0, 6))
+
+        self.wgs_dms_controls = tk.Frame(frame, bg=C["bg"])
+        self.wgs_dms_controls.pack(pady=(5, 0), **PAD)
+        for txt, cmd in [
+            ("＋  Νέα γραμμή", self._add_wgs_dms_row),
+            ("−  Τελευταία γραμμή", self._remove_last_wgs_dms_row),
+            ("✕  Καθαρισμός", self._clear_wgs84_fields),
+        ]:
+            tk.Button(self.wgs_dms_controls, text=txt, command=cmd,
+                      font=("Segoe UI", 8), relief="flat", bd=0,
+                      bg=C["bg"], fg=C["text_mid"],
+                      activebackground=C["border"],
+                      padx=8, pady=4, cursor="hand2"
+                      ).pack(side="left", padx=(0, 5))
 
         tk.Frame(frame, bg=C["border"], height=1).pack(fill="x", padx=12, pady=(8, 0))
 
@@ -1868,10 +1944,23 @@ class HATTEgsaApp:
                 )
 
     def _update_wgs84_ui(self) -> None:
-        """Ενημερώνει τίτλους/οδηγίες χωρίς να αλλάζει τα δεδομένα εισόδου."""
+        """Ενημερώνει τίτλους και εναλλάσσει text/DMS-table input."""
         self._refresh_wgs_direction_buttons()
         direction = self.wgs_direction_var.get()
         fmt = self.wgs_format_var.get()
+        use_dms_table = direction == "WGS_TO_EGSA" and fmt == "dms"
+
+        self.wgs_text_input_frame.pack_forget()
+        self.wgs_dms_input_frame.pack_forget()
+        self.wgs_text_controls.pack_forget()
+        self.wgs_dms_controls.pack_forget()
+
+        if use_dms_table:
+            self.wgs_dms_input_frame.pack(fill="x")
+            self.wgs_dms_controls.pack(pady=(5, 0), padx=12)
+        else:
+            self.wgs_text_input_frame.pack(fill="x")
+            self.wgs_text_controls.pack(pady=(5, 0), padx=12)
 
         if direction == "EGSA_TO_WGS":
             self.wgs_input_title_var.set("Σημεία εισόδου σε ΕΓΣΑ87")
@@ -1887,12 +1976,119 @@ class HATTEgsaApp:
             if fmt == "decimal":
                 self.wgs_input_hint_var.set("(Όνομα Latitude Longitude) — π.χ. A 40.272123 22.503456")
             else:
-                self.wgs_input_hint_var.set("π.χ. A 40°16′19.643″N 22°30′12.442″E")
+                self.wgs_input_hint_var.set("DMS: γράψε μόνο αριθμούς · οι διευθύνσεις επιλέγονται από N/S και E/W")
             self.wgs_calc_text_var.set("  ➜   Μετατροπή σε ΕΓΣΑ87  ")
             self.wgs_output_title_var.set("Αποτελέσματα σε ΕΓΣΑ87")
 
+    def _add_wgs_dms_row(self) -> None:
+        """Προσθέτει μία επεξεργάσιμη γραμμή DMS. Η τελευταία γραμμή επεκτείνει αυτόματα τον πίνακα."""
+        index = len(self._wgs_dms_rows)
+        row_frame = tk.Frame(self.wgs_dms_inner, bg=C["white"])
+        row_frame.pack(fill="x", padx=3, pady=2)
+
+        row = {
+            "frame": row_frame,
+            "name": tk.StringVar(master=self.root, value=self._auto_point_name(index)),
+            "lat_deg": tk.StringVar(master=self.root),
+            "lat_min": tk.StringVar(master=self.root),
+            "lat_sec": tk.StringVar(master=self.root),
+            "lat_hem": tk.StringVar(master=self.root, value="N"),
+            "lon_deg": tk.StringVar(master=self.root),
+            "lon_min": tk.StringVar(master=self.root),
+            "lon_sec": tk.StringVar(master=self.root),
+            "lon_hem": tk.StringVar(master=self.root, value="E"),
+        }
+
+        specs = [
+            ("name", 7), ("lat_deg", 5), ("lat_min", 4), ("lat_sec", 8),
+            ("lat_hem", 4), ("lon_deg", 5), ("lon_min", 4), ("lon_sec", 8),
+            ("lon_hem", 4),
+        ]
+        for col, (key, width) in enumerate(specs):
+            if key in ("lat_hem", "lon_hem"):
+                values = ("N", "S") if key == "lat_hem" else ("E", "W")
+                widget = ttk.Combobox(
+                    row_frame, textvariable=row[key], values=values,
+                    width=max(2, width - 1), state="readonly",
+                    style="Modern.TCombobox"
+                )
+            else:
+                widget = tk.Entry(
+                    row_frame, textvariable=row[key], width=width,
+                    font=("Consolas", 8), justify="center",
+                    bg=C["input_bg"], fg=C["text"],
+                    relief="solid", bd=1
+                )
+            widget.grid(row=0, column=col, padx=1, pady=1)
+
+        self._wgs_dms_rows.append(row)
+        for key in ("lat_deg", "lat_min", "lat_sec", "lon_deg", "lon_min", "lon_sec"):
+            row[key].trace_add(
+                "write",
+                lambda *_args, r=row: self.root.after_idle(
+                    lambda: self._ensure_wgs_dms_trailing_row(r)
+                )
+            )
+
+        self.root.after_idle(
+            lambda: self.wgs_dms_canvas.yview_moveto(1.0)
+            if hasattr(self, "wgs_dms_canvas") else None
+        )
+
+    def _ensure_wgs_dms_trailing_row(self, row: dict) -> None:
+        """Όταν αρχίσει να συμπληρώνεται η τελευταία γραμμή, δημιουργεί μία νέα κενή."""
+        if not self._wgs_dms_rows or row is not self._wgs_dms_rows[-1]:
+            return
+        keys = ("lat_deg", "lat_min", "lat_sec", "lon_deg", "lon_min", "lon_sec")
+        if any(row[key].get().strip() for key in keys):
+            self._add_wgs_dms_row()
+
+    def _remove_last_wgs_dms_row(self) -> None:
+        if len(self._wgs_dms_rows) <= 1:
+            return
+        row = self._wgs_dms_rows.pop()
+        row["frame"].destroy()
+
+    def _reset_wgs_dms_rows(self) -> None:
+        for row in self._wgs_dms_rows:
+            row["frame"].destroy()
+        self._wgs_dms_rows.clear()
+        for _ in range(4):
+            self._add_wgs_dms_row()
+        self.wgs_dms_canvas.yview_moveto(0.0)
+
+    def _collect_wgs_dms_points(self) -> Tuple[List[WGS84Point], List[str]]:
+        """Διαβάζει τις συμπληρωμένες γραμμές του DMS πίνακα και αγνοεί τις τελείως κενές."""
+        points: List[WGS84Point] = []
+        errors: List[str] = []
+        coord_keys = ("lat_deg", "lat_min", "lat_sec", "lon_deg", "lon_min", "lon_sec")
+
+        for row_index, row in enumerate(self._wgs_dms_rows, 1):
+            values = [row[key].get().strip() for key in coord_keys]
+            if not any(values):
+                continue
+            name = row["name"].get().strip() or self._auto_point_name(row_index - 1)
+            if not all(values):
+                errors.append(f"Γραμμή {row_index} ({name}): συμπλήρωσε όλα τα πεδία μοιρών, λεπτών και δευτερολέπτων.")
+                continue
+            try:
+                latitude = dms_components_to_decimal(
+                    row["lat_deg"].get(), row["lat_min"].get(), row["lat_sec"].get(),
+                    row["lat_hem"].get(), "lat"
+                )
+                longitude = dms_components_to_decimal(
+                    row["lon_deg"].get(), row["lon_min"].get(), row["lon_sec"].get(),
+                    row["lon_hem"].get(), "lon"
+                )
+                points.append(WGS84Point(name=name, latitude=latitude, longitude=longitude))
+            except ValueError as exc:
+                errors.append(f"Γραμμή {row_index} ({name}): {exc}")
+
+        return points, errors
+
     def _clear_wgs84_fields(self) -> None:
         self.wgs_input.delete("1.0", tk.END)
+        self._reset_wgs_dms_rows()
         self.wgs_output.config(state="normal")
         self.wgs_output.delete("1.0", tk.END)
         self.wgs_output.config(state="disabled")
@@ -1910,6 +2106,41 @@ class HATTEgsaApp:
                  fg=C["text_dim"], bg=C["bg"],
                  font=("Segoe UI", 8)
                  ).pack(side="right", padx=10, pady=3)
+
+    def _stabilize_main_window_size(self) -> None:
+        """Κρατά σταθερό το κύριο παράθυρο στο μέγεθος της μεγαλύτερης καρτέλας."""
+        frames = [self.frame_HATT, self.frame_egsa, self.frame_wgs84]
+        selected = self.mode_var.get()
+        max_width = 0
+        max_height = 0
+
+        # Το root είναι ακόμη κρυφό πίσω από το splash, οπότε η μέτρηση δεν
+        # προκαλεί ορατό τρεμόπαιγμα στον χρήστη.
+        for candidate in frames:
+            for item in frames:
+                item.pack_forget()
+            candidate.pack(fill="x", pady=5)
+            self.root.update_idletasks()
+            max_width = max(max_width, self.root.winfo_reqwidth())
+            max_height = max(max_height, self.root.winfo_reqheight())
+
+        for item in frames:
+            item.pack_forget()
+        if selected == "HATT":
+            self.frame_HATT.pack(fill="x", pady=5)
+        elif selected == "egsa":
+            self.frame_egsa.pack(fill="x", pady=5)
+        else:
+            self.frame_wgs84.pack(fill="x", pady=5)
+
+        self.root.update_idletasks()
+        screen_width = max(640, self.root.winfo_screenwidth() - 40)
+        screen_height = max(600, self.root.winfo_screenheight() - 80)
+        width = min(max_width, screen_width)
+        height = min(max_height, screen_height)
+
+        self.root.geometry(f"{width}x{height}")
+        self.root.minsize(width, height)
 
     def _switch_mode(self):
         """Εναλλαγή μεταξύ HATT, EGSA και WGS84 mode."""
@@ -2054,7 +2285,10 @@ class HATTEgsaApp:
                     lon_text = f"{point.longitude:.8f}"
                 output_lines.append(f"{point.name}\t{lat_text}\t{lon_text}")
         else:
-            wgs_points, errors = parse_wgs84_points(text, fmt)
+            if fmt == "dms":
+                wgs_points, errors = self._collect_wgs_dms_points()
+            else:
+                wgs_points, errors = parse_wgs84_points(text, fmt)
             if errors:
                 messagebox.showwarning("Προειδοποίηση", "Κάποια σημεία αγνοήθηκαν:\n" + "\n".join(errors[:5]))
             if not wgs_points:
