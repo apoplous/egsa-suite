@@ -21,6 +21,7 @@ from geotoolsgr import (
     save_user_settings,
     configured_default_region,
 )
+from wgs84_utils import format_wgs84_dms, parse_wgs84_points
 
 
 def P(name, x, y):
@@ -229,3 +230,38 @@ def test_official_high_order_precision_regression():
     assert HATT_COEFFICIENTS["ΒΑΡΘΟΛΟΜΙΟΝ"]["B"][5] == -12.05e-9
     assert HATT_COEFFICIENTS["ΝΗΣΟΣ ΑΝΑΦΗ"]["A"][5] == -12.44e-9
     assert HATT_COEFFICIENTS["ΝΗΣΟΙ ΠΑΞΟΙ"]["B"][5] == -14.85e-9
+
+
+def test_egsa_wgs84_roundtrip_regression():
+    tr = CoordinateTransformer()
+    original_x = Decimal("369585.94")
+    original_y = Decimal("4456429.27")
+    lon, lat = tr.egsa_to_wgs84(original_x, original_y)
+    roundtrip_x, roundtrip_y = tr.wgs84_to_egsa(lon, lat)
+    assert abs(roundtrip_x - original_x) < Decimal("0.001")
+    assert abs(roundtrip_y - original_y) < Decimal("0.001")
+
+
+def test_wgs84_decimal_parser_accepts_google_and_greek_decimal_styles():
+    points, errors = parse_wgs84_points(
+        "A 40.27212345, 22.50345678\nB 40,27222345 22,50355678",
+        "decimal",
+    )
+    assert errors == []
+    assert len(points) == 2
+    assert points[0].latitude == pytest.approx(40.27212345)
+    assert points[0].longitude == pytest.approx(22.50345678)
+    assert points[1].latitude == pytest.approx(40.27222345)
+    assert points[1].longitude == pytest.approx(22.50355678)
+
+
+def test_wgs84_dms_format_and_parser_roundtrip():
+    latitude = 40.27212345
+    longitude = 22.50345678
+    lat_dms = format_wgs84_dms(latitude, "lat")
+    lon_dms = format_wgs84_dms(longitude, "lon")
+    points, errors = parse_wgs84_points(f"A {lat_dms} {lon_dms}", "dms")
+    assert errors == []
+    assert len(points) == 1
+    assert points[0].latitude == pytest.approx(latitude, abs=3e-7)
+    assert points[0].longitude == pytest.approx(longitude, abs=3e-7)
