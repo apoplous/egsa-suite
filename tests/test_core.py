@@ -21,7 +21,7 @@ from geotoolsgr import (
     save_user_settings,
     configured_default_region,
 )
-from wgs84_utils import format_wgs84_dms, parse_wgs84_points
+from wgs84_utils import dms_components_to_decimal, format_wgs84_dms, parse_wgs84_points
 
 
 def P(name, x, y):
@@ -268,3 +268,21 @@ def test_wgs84_dms_format_and_parser_roundtrip():
     assert len(points) == 1
     assert points[0].latitude == pytest.approx(latitude, abs=3e-7)
     assert points[0].longitude == pytest.approx(longitude, abs=3e-7)
+
+
+def test_wgs84_numeric_dms_components_for_form_input():
+    lat = dms_components_to_decimal("40", "16", "19,643", "N", "lat")
+    lon = dms_components_to_decimal("22", "30", "12.442", "E", "lon")
+    assert lat == pytest.approx(40.2721230556)
+    assert lon == pytest.approx(22.5034561111)
+    assert dms_components_to_decimal("40", "16", "19.643", "S", "lat") < 0
+    assert dms_components_to_decimal("22", "30", "12.442", "W", "lon") < 0
+
+
+def test_wgs84_numeric_dms_components_reject_invalid_fields():
+    with pytest.raises(ValueError):
+        dms_components_to_decimal("40", "60", "0", "N", "lat")
+    with pytest.raises(ValueError):
+        dms_components_to_decimal("181", "0", "0", "E", "lon")
+    with pytest.raises(ValueError):
+        dms_components_to_decimal("40", "0", "0", "E", "lat")
