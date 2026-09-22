@@ -2,7 +2,7 @@
 setlocal EnableExtensions
 cd /d "%~dp0"
 
-set "VERSION=5.4.0-beta.3"
+set "VERSION=5.6.0"
 set "RELEASE_NAME=EGSA_Suite_v%VERSION%_Windows_x64"
 
 title EGSA Suite %VERSION% - Build EXE
