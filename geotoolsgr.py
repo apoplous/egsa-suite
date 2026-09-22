@@ -1,6 +1,6 @@
 """
 EGSA Suite – Coordinate Transformation Suite
-Version 5.5.0 - Stable Release
+Version 5.6.0 - Stable Release
 Author: D.T. 2026
 
 Μετατροπή συντεταγμένων από το τοπικό σύστημα HATT στο ΕΓΣΑ87
@@ -186,7 +186,7 @@ def _show_splash() -> tk.Toplevel | None:
                                           fill="#8fbc8f", outline="")
 
         # ── Version ──
-        c.create_text(TX, 248, text="v5.5.0  ·  390 εγγραφές HATT  ·  2026",
+        c.create_text(TX, 248, text="v5.6.0  ·  390 εγγραφές HATT  ·  2026",
                       font=("Segoe UI", 8), fill="#2a6e3f", anchor="w")
 
         splash.update()
@@ -310,7 +310,7 @@ _GE_WORK_DIR = Path(_tempfile.gettempdir()) / "egsa_suite_ge"
 # ==================== CONFIGURATION ====================
 
 getcontext().prec = 34
-APP_VERSION = "5.5.0"
+APP_VERSION = "5.6.0"
 DISPLAY_DEC = Decimal("0.01")
 
 # ── Χρωματική παλέτα ─────────────────────────────────────────────────────────

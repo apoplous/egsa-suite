@@ -1,5 +1,19 @@
 # Changelog
 
+## 5.6.0 — 2026-09-22
+
+### Added
+- DXF export now allows selecting the target AutoCAD/DXF version: **2000, 2004, 2007, 2010, 2013 or 2018**.
+- AutoCAD 2010 / `R2010` remains the default, preserving the previous export behaviour when the user does not change the selection.
+- Regression tests verify that each selectable version is written correctly and can be read back as an `LWPOLYLINE`.
+
+### Compatibility / safety
+- Existing DXF geometry behaviour is unchanged: `EGSA_BOUNDARY` remains the base polyline layer, while POINT and TEXT vertex options remain independent and optional.
+- DXF R12 is intentionally not offered because it would require a separate legacy `POLYLINE` export path instead of the existing `LWPOLYLINE`.
+- HATT coefficients, HATT → EGSA87 transformation logic, EGSA87 ↔ WGS84, Shapefile handling, Google Earth integration and map-provider behaviour are unchanged.
+- OpenStreetMap remains removed from the map selector; ESRI Satellite and Google Maps remain available.
+
+
 ## 5.5.0 — 2026-09-22
 
 **First stable release.** This release adds a dedicated EGSA87 ↔ WGS84 workflow and consolidates

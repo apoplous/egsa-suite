@@ -4,11 +4,11 @@
 HATT → EGSA87, EGSA87 ↔ WGS84, geometry tools, Shapefile/DXF exchange, map preview and
 Google Earth Pro integration.
 
-> **Current stable release:** `v5.5.0`
+> **Current stable release:** `v5.6.0`
 
 ## Λήψη για Windows
 
-**[⬇ Download EGSA Suite v5.5.0 — Windows x64](https://github.com/apoplous/egsa-suite/releases/latest/download/EGSA_Suite_v5.5.0_Windows_x64.zip)**  
+**[⬇ Download EGSA Suite v5.6.0 — Windows x64](https://github.com/apoplous/egsa-suite/releases/latest/download/EGSA_Suite_v5.6.0_Windows_x64.zip)**  
 [Release page](https://github.com/apoplous/egsa-suite/releases/latest) · [SHA256SUMS.txt](https://github.com/apoplous/egsa-suite/releases/latest/download/SHA256SUMS.txt)
 
 Portable έκδοση για Windows x64. Δεν απαιτείται εγκατάσταση Python.
@@ -36,6 +36,7 @@ GIS, CAD και Google Earth. Στόχος είναι να είναι ένα π�
 - Ασφαλής επιλογή feature/part σε multi-feature ή multipart Shapefile.
 - Ανάγνωση κοινών `.cpg` encodings για παλαιότερα ελληνικά DBF attributes (π.χ. CP1253).
 - Import/export DXF με επιλογή polyline και έλεγχο μονάδων/εύρους.
+- Επιλογή έκδοσης DXF κατά την εξαγωγή: AutoCAD 2000, 2004, 2007, 2010, 2013 ή 2018 (προεπιλογή: 2010).
 - Στην εξαγωγή DXF, τα POINT entities και τα ονόματα κορυφών (TEXT) είναι ανεξάρτητες προαιρετικές επιλογές.
 - Προβολή σε χάρτη και Google Maps.
 - Google Earth Pro live NetworkLink και camera tracking μέσω local-only HTTP server (`127.0.0.1`).
@@ -81,10 +82,10 @@ python -m pytest -q
 
 ## Σημαντική προειδοποίηση για HATT
 
-Οι συντελεστές HATT της `v5.5.0` είναι οι επανελεγμένοι συντελεστές που εισήχθησαν στη
+Οι συντελεστές HATT της `v5.6.0` είναι οι επανελεγμένοι συντελεστές που εισήχθησαν στη
 `v5.4.0-beta.3`, με βασική πηγή την επίσημη ιστορική έκδοση **ΟΚΧΕ / ΓΥΣ / ΕΜΠ** των πινάκων
 HATT → ΕΓΣΑ87. Οι διορθώσεις αφορούσαν σφάλματα μεταγραφής παλαιότερου ηλεκτρονικού πίνακα.
-Η `v5.5.0` δεν αλλάζει τους HATT coefficients ή τον πολυωνυμικό αλγόριθμο της beta.3.
+Η `v5.6.0` δεν αλλάζει τους HATT coefficients ή τον πολυωνυμικό αλγόριθμο της beta.3.
 
 Η ίδια η επίσημη έκδοση διευκρινίζει ότι τα πολυώνυμα προορίζονται για ένταξη χαρτογραφικών
 εργασιών και **δεν παρέχουν γεωδαιτική ακρίβεια**. Η εφαρμογή τους προϋποθέτει επίσης τη σωστή
