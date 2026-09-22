@@ -1758,17 +1758,43 @@ class HATTEgsaApp:
         ).pack(side="left", pady=4)
 
         dms_header = tk.Frame(self.wgs_dms_input_frame, bg=C["bg"])
-        dms_header.pack(fill="x", pady=(0, 3))
-        headers = [
-            ("Σημείο", 8), ("Lat °", 6), ("′", 5), ("″", 9),
-            ("Lon °", 6), ("′", 5), ("″", 9),
-        ]
-        for col, (label, width) in enumerate(headers):
+        dms_header.pack(fill="x", pady=(0, 4))
+
+        tk.Label(
+            dms_header, text="Σημείο", width=8,
+            font=("Segoe UI", 7, "bold"), fg=C["text_dim"], bg=C["bg"],
+            anchor="center"
+        ).grid(row=0, column=0, rowspan=2, padx=(4, 6), sticky="ns")
+
+        tk.Label(
+            dms_header, text="LATITUDE",
+            font=("Segoe UI", 7, "bold"), fg=C["green_dark"], bg=C["green_light"],
+            padx=8, pady=2
+        ).grid(row=0, column=1, columnspan=3, padx=(0, 5), sticky="ew")
+
+        tk.Frame(dms_header, bg=C["border"], width=2).grid(
+            row=0, column=4, rowspan=2, padx=5, sticky="ns"
+        )
+
+        tk.Label(
+            dms_header, text="LONGITUDE",
+            font=("Segoe UI", 7, "bold"), fg=C["green_dark"], bg=C["green_light"],
+            padx=8, pady=2
+        ).grid(row=0, column=5, columnspan=3, padx=(5, 0), sticky="ew")
+
+        for col, (label, width) in enumerate([("°", 6), ("′", 5), ("″", 9)], start=1):
             tk.Label(
                 dms_header, text=label, width=width,
                 font=("Segoe UI", 7, "bold"), fg=C["text_dim"], bg=C["bg"],
                 anchor="center"
-            ).grid(row=0, column=col, padx=2)
+            ).grid(row=1, column=col, padx=1, pady=(2, 0))
+
+        for col, (label, width) in enumerate([("°", 6), ("′", 5), ("″", 9)], start=5):
+            tk.Label(
+                dms_header, text=label, width=width,
+                font=("Segoe UI", 7, "bold"), fg=C["text_dim"], bg=C["bg"],
+                anchor="center"
+            ).grid(row=1, column=col, padx=1, pady=(2, 0))
 
         dms_body_outer = tk.Frame(
             self.wgs_dms_input_frame, bg=C["output_bg"],
@@ -1777,7 +1803,7 @@ class HATTEgsaApp:
         dms_body_outer.pack(fill="x")
 
         self.wgs_dms_canvas = tk.Canvas(
-            dms_body_outer, height=92, bg=C["output_bg"],
+            dms_body_outer, height=158, bg=C["output_bg"],
             highlightthickness=0, bd=0
         )
         dms_scroll = tk.Scrollbar(
@@ -2016,11 +2042,8 @@ class HATTEgsaApp:
     def _add_wgs_dms_row(self) -> None:
         """Προσθέτει μία επεξεργάσιμη γραμμή DMS. Η τελευταία γραμμή επεκτείνει αυτόματα τον πίνακα."""
         index = len(self._wgs_dms_rows)
-        row_frame = tk.Frame(
-            self.wgs_dms_inner, bg=C["white"],
-            highlightthickness=1, highlightbackground=C["border"]
-        )
-        row_frame.pack(fill="x", padx=5, pady=3)
+        row_frame = tk.Frame(self.wgs_dms_inner, bg=C["output_bg"])
+        row_frame.pack(fill="x", padx=5, pady=1)
 
         row = {
             "frame": row_frame,
@@ -2033,21 +2056,38 @@ class HATTEgsaApp:
             "lon_sec": tk.StringVar(master=self.root),
         }
 
-        specs = [
-            ("name", 8), ("lat_deg", 6), ("lat_min", 5), ("lat_sec", 9),
-            ("lon_deg", 6), ("lon_min", 5), ("lon_sec", 9),
-        ]
-        for col, (key, width) in enumerate(specs):
-            widget = tk.Entry(
-                row_frame, textvariable=row[key], width=width,
-                font=("Consolas", 9), justify="center",
-                bg=C["input_bg"], fg=C["text"],
-                relief="flat", bd=0,
-                highlightthickness=1,
-                highlightbackground=C["border"],
-                highlightcolor=C["green_mid"]
+        name_entry = tk.Entry(
+            row_frame, textvariable=row["name"], width=8,
+            font=("Consolas", 9, "bold"), justify="center",
+            bg=C["white"], fg=C["green_dark"],
+            relief="flat", bd=0,
+            highlightthickness=1,
+            highlightbackground=C["border"],
+            highlightcolor=C["green_mid"]
+        )
+        name_entry.pack(side="left", padx=(0, 7), pady=3)
+
+        def add_group(keys, bg):
+            group = tk.Frame(
+                row_frame, bg=bg,
+                highlightthickness=1, highlightbackground=C["border"]
             )
-            widget.grid(row=0, column=col, padx=3, pady=6)
+            group.pack(side="left", padx=(0, 9), pady=1)
+            widths = (6, 5, 9)
+            for key, width in zip(keys, widths):
+                tk.Entry(
+                    group, textvariable=row[key], width=width,
+                    font=("Consolas", 9), justify="center",
+                    bg=C["white"], fg=C["text"],
+                    relief="flat", bd=0,
+                    highlightthickness=1,
+                    highlightbackground=C["border"],
+                    highlightcolor=C["green_mid"]
+                ).pack(side="left", padx=2, pady=3)
+            return group
+
+        row["lat_group"] = add_group(("lat_deg", "lat_min", "lat_sec"), C["green_light"])
+        row["lon_group"] = add_group(("lon_deg", "lon_min", "lon_sec"), C["green_light"])
 
         self._wgs_dms_rows.append(row)
         for key in ("lat_deg", "lat_min", "lat_sec", "lon_deg", "lon_min", "lon_sec"):
