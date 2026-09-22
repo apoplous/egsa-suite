@@ -1,10 +1,17 @@
 # EGSA Suite
 
 **Desktop coordinate and geometry utility for Greek GIS/CAD workflows.**  
-HATT → EGSA87 transformations, EGSA87 geometry tools, Shapefile/DXF exchange, map preview and
+HATT → EGSA87, EGSA87 ↔ WGS84, geometry tools, Shapefile/DXF exchange, map preview and
 Google Earth Pro integration.
 
-> **Current public-release candidate:** `v5.4.0-beta.3`
+> **Current stable release:** `v5.5.0`
+
+## Λήψη για Windows
+
+**[⬇ Download EGSA Suite v5.5.0 — Windows x64](https://github.com/apoplous/egsa-suite/releases/latest/download/EGSA_Suite_v5.5.0_Windows_x64.zip)**  
+[Release page](https://github.com/apoplous/egsa-suite/releases/latest) · [SHA256SUMS.txt](https://github.com/apoplous/egsa-suite/releases/latest/download/SHA256SUMS.txt)
+
+Portable έκδοση για Windows x64. Δεν απαιτείται εγκατάσταση Python.
 
 ![EGSA Suite UI](docs/egsa-suite-ui.png)
 
@@ -21,6 +28,8 @@ GIS, CAD και Google Earth. Στόχος είναι να είναι ένα π�
 - HATT → ΕΓΣΑ87 με 390 εγγραφές πολυωνυμικού μετασχηματισμού.
 - Επιλογή και μόνιμη αποθήκευση προεπιλεγμένου φύλλου HATT ανά χρήστη.
 - Άμεση εισαγωγή/επεξεργασία συντεταγμένων ΕΓΣΑ87.
+- Αμφίδρομη μετατροπή ΕΓΣΑ87 ↔ WGS84 (EPSG:2100 ↔ EPSG:4326).
+- WGS84 σε δεκαδικές μοίρες ή μοίρες/λεπτά/δευτερόλεπτα (DMS), με ειδικό πίνακα αριθμητικής εισαγωγής DMS.
 - Εμβαδόν, αποστάσεις και οπτικός έλεγχος πολυγώνου.
 - Έλεγχος αυτοτομών και βασικών σφαλμάτων γεωμετρίας πριν από export.
 - Import/export Shapefile με CRS check για EPSG:2100.
@@ -36,9 +45,10 @@ GIS, CAD και Google Earth. Στόχος είναι να είναι ένα π�
 Για τους περισσότερους χρήστες η προτεινόμενη διανομή είναι το έτοιμο portable Windows build από
 τη σελίδα **Releases** του GitHub. Δεν απαιτείται εγκατάσταση Python.
 
-Σε unsigned beta builds, το Windows SmartScreen μπορεί να εμφανίσει προειδοποίηση "Unknown
-publisher". Πριν εκτελέσεις binary από οποιαδήποτε πηγή, επιβεβαίωσε ότι προέρχεται από το επίσημο
-repository/release.
+Το Windows build δεν διαθέτει ακόμη ψηφιακή υπογραφή κώδικα, επομένως το SmartScreen μπορεί να
+εμφανίσει προειδοποίηση "Unknown publisher". Πριν εκτελέσεις binary από οποιαδήποτε πηγή,
+επιβεβαίωσε ότι προέρχεται από το επίσημο repository/release και, αν χρειάζεται, έλεγξε το
+`SHA256SUMS.txt`.
 
 ## Εκτέλεση από source
 
@@ -71,10 +81,10 @@ python -m pytest -q
 
 ## Σημαντική προειδοποίηση για HATT
 
-Οι συντελεστές HATT της `v5.4.0-beta.3` έχουν επανελεγχθεί με βασική πηγή την επίσημη ιστορική
-έκδοση **ΟΚΧΕ / ΓΥΣ / ΕΜΠ** των πινάκων HATT → ΕΓΣΑ87. Η beta.3 διορθώνει σφάλματα μεταγραφής
-που εντοπίστηκαν σε παλαιότερο ηλεκτρονικό πίνακα και δεν πρέπει να αντικαθίσταται από beta.1 ή
-beta.2 για νέες μετατροπές HATT.
+Οι συντελεστές HATT της `v5.5.0` είναι οι επανελεγμένοι συντελεστές που εισήχθησαν στη
+`v5.4.0-beta.3`, με βασική πηγή την επίσημη ιστορική έκδοση **ΟΚΧΕ / ΓΥΣ / ΕΜΠ** των πινάκων
+HATT → ΕΓΣΑ87. Οι διορθώσεις αφορούσαν σφάλματα μεταγραφής παλαιότερου ηλεκτρονικού πίνακα.
+Η `v5.5.0` δεν αλλάζει τους HATT coefficients ή τον πολυωνυμικό αλγόριθμο της beta.3.
 
 Η ίδια η επίσημη έκδοση διευκρινίζει ότι τα πολυώνυμα προορίζονται για ένταξη χαρτογραφικών
 εργασιών και **δεν παρέχουν γεωδαιτική ακρίβεια**. Η εφαρμογή τους προϋποθέτει επίσης τη σωστή
