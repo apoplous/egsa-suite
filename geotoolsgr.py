@@ -1075,6 +1075,8 @@ class HATTEgsaApp:
         self.map_style_var = tk.StringVar(master=root, value="ESRI Satellite")
         self.wgs_direction_var = tk.StringVar(master=root, value="EGSA_TO_WGS")
         self.wgs_format_var = tk.StringVar(master=root, value="decimal")
+        self.wgs_lat_hem_var = tk.StringVar(master=root, value="N")
+        self.wgs_lon_hem_var = tk.StringVar(master=root, value="E")
 
         # Camera tracking vars — αρχικοποίηση εδώ ώστε να υπάρχουν πάντα
         self._ge_cam_x_var   = tk.StringVar(master=root, value="—")
@@ -1723,27 +1725,59 @@ class HATTEgsaApp:
 
         self.wgs_dms_input_frame = tk.Frame(self.wgs_input_host, bg=C["bg"])
 
+        # Καθολική επιλογή ημισφαιρίου για όλα τα σημεία του πίνακα.
+        hemisphere_card = tk.Frame(
+            self.wgs_dms_input_frame, bg=C["green_light"],
+            highlightthickness=1, highlightbackground=C["accent"]
+        )
+        hemisphere_card.pack(fill="x", pady=(0, 7))
+        tk.Label(
+            hemisphere_card, text="Κατεύθυνση συντεταγμένων",
+            font=("Segoe UI", 8, "bold"), fg=C["green_dark"],
+            bg=C["green_light"]
+        ).pack(side="left", padx=(10, 14), pady=7)
+
+        tk.Label(
+            hemisphere_card, text="Latitude",
+            font=("Segoe UI", 8), fg=C["text_mid"], bg=C["green_light"]
+        ).pack(side="left", padx=(0, 4))
+        ttk.Combobox(
+            hemisphere_card, textvariable=self.wgs_lat_hem_var,
+            values=("N", "S"), width=3, state="readonly",
+            style="Modern.TCombobox"
+        ).pack(side="left", padx=(0, 14), pady=4)
+
+        tk.Label(
+            hemisphere_card, text="Longitude",
+            font=("Segoe UI", 8), fg=C["text_mid"], bg=C["green_light"]
+        ).pack(side="left", padx=(0, 4))
+        ttk.Combobox(
+            hemisphere_card, textvariable=self.wgs_lon_hem_var,
+            values=("E", "W"), width=3, state="readonly",
+            style="Modern.TCombobox"
+        ).pack(side="left", pady=4)
+
         dms_header = tk.Frame(self.wgs_dms_input_frame, bg=C["bg"])
         dms_header.pack(fill="x", pady=(0, 3))
         headers = [
-            ("Σημείο", 7), ("Lat °", 5), ("′", 4), ("″", 8), ("N/S", 4),
-            ("Lon °", 5), ("′", 4), ("″", 8), ("E/W", 4),
+            ("Σημείο", 8), ("Lat °", 6), ("′", 5), ("″", 9),
+            ("Lon °", 6), ("′", 5), ("″", 9),
         ]
         for col, (label, width) in enumerate(headers):
             tk.Label(
                 dms_header, text=label, width=width,
                 font=("Segoe UI", 7, "bold"), fg=C["text_dim"], bg=C["bg"],
                 anchor="center"
-            ).grid(row=0, column=col, padx=1)
+            ).grid(row=0, column=col, padx=2)
 
         dms_body_outer = tk.Frame(
-            self.wgs_dms_input_frame, bg=C["white"],
+            self.wgs_dms_input_frame, bg=C["output_bg"],
             highlightthickness=1, highlightbackground=C["border"]
         )
         dms_body_outer.pack(fill="x")
 
         self.wgs_dms_canvas = tk.Canvas(
-            dms_body_outer, height=130, bg=C["white"],
+            dms_body_outer, height=92, bg=C["output_bg"],
             highlightthickness=0, bd=0
         )
         dms_scroll = tk.Scrollbar(
@@ -1754,7 +1788,7 @@ class HATTEgsaApp:
         self.wgs_dms_canvas.pack(side="left", fill="both", expand=True)
         dms_scroll.pack(side="right", fill="y")
 
-        self.wgs_dms_inner = tk.Frame(self.wgs_dms_canvas, bg=C["white"])
+        self.wgs_dms_inner = tk.Frame(self.wgs_dms_canvas, bg=C["output_bg"])
         self._wgs_dms_window = self.wgs_dms_canvas.create_window(
             (0, 0), window=self.wgs_dms_inner, anchor="nw"
         )
@@ -1772,8 +1806,7 @@ class HATTEgsaApp:
         )
 
         self._wgs_dms_rows = []
-        for _ in range(4):
-            self._add_wgs_dms_row()
+        self._add_wgs_dms_row()
 
         self.wgs_text_controls = tk.Frame(frame, bg=C["bg"])
         self.wgs_text_controls.pack(pady=(5, 0), **PAD)
@@ -1976,15 +2009,18 @@ class HATTEgsaApp:
             if fmt == "decimal":
                 self.wgs_input_hint_var.set("(Όνομα Latitude Longitude) — π.χ. A 40.272123 22.503456")
             else:
-                self.wgs_input_hint_var.set("DMS: γράψε μόνο αριθμούς · οι διευθύνσεις επιλέγονται από N/S και E/W")
+                self.wgs_input_hint_var.set("")
             self.wgs_calc_text_var.set("  ➜   Μετατροπή σε ΕΓΣΑ87  ")
             self.wgs_output_title_var.set("Αποτελέσματα σε ΕΓΣΑ87")
 
     def _add_wgs_dms_row(self) -> None:
         """Προσθέτει μία επεξεργάσιμη γραμμή DMS. Η τελευταία γραμμή επεκτείνει αυτόματα τον πίνακα."""
         index = len(self._wgs_dms_rows)
-        row_frame = tk.Frame(self.wgs_dms_inner, bg=C["white"])
-        row_frame.pack(fill="x", padx=3, pady=2)
+        row_frame = tk.Frame(
+            self.wgs_dms_inner, bg=C["white"],
+            highlightthickness=1, highlightbackground=C["border"]
+        )
+        row_frame.pack(fill="x", padx=5, pady=3)
 
         row = {
             "frame": row_frame,
@@ -1992,34 +2028,26 @@ class HATTEgsaApp:
             "lat_deg": tk.StringVar(master=self.root),
             "lat_min": tk.StringVar(master=self.root),
             "lat_sec": tk.StringVar(master=self.root),
-            "lat_hem": tk.StringVar(master=self.root, value="N"),
             "lon_deg": tk.StringVar(master=self.root),
             "lon_min": tk.StringVar(master=self.root),
             "lon_sec": tk.StringVar(master=self.root),
-            "lon_hem": tk.StringVar(master=self.root, value="E"),
         }
 
         specs = [
-            ("name", 7), ("lat_deg", 5), ("lat_min", 4), ("lat_sec", 8),
-            ("lat_hem", 4), ("lon_deg", 5), ("lon_min", 4), ("lon_sec", 8),
-            ("lon_hem", 4),
+            ("name", 8), ("lat_deg", 6), ("lat_min", 5), ("lat_sec", 9),
+            ("lon_deg", 6), ("lon_min", 5), ("lon_sec", 9),
         ]
         for col, (key, width) in enumerate(specs):
-            if key in ("lat_hem", "lon_hem"):
-                values = ("N", "S") if key == "lat_hem" else ("E", "W")
-                widget = ttk.Combobox(
-                    row_frame, textvariable=row[key], values=values,
-                    width=max(2, width - 1), state="readonly",
-                    style="Modern.TCombobox"
-                )
-            else:
-                widget = tk.Entry(
-                    row_frame, textvariable=row[key], width=width,
-                    font=("Consolas", 8), justify="center",
-                    bg=C["input_bg"], fg=C["text"],
-                    relief="solid", bd=1
-                )
-            widget.grid(row=0, column=col, padx=1, pady=1)
+            widget = tk.Entry(
+                row_frame, textvariable=row[key], width=width,
+                font=("Consolas", 9), justify="center",
+                bg=C["input_bg"], fg=C["text"],
+                relief="flat", bd=0,
+                highlightthickness=1,
+                highlightbackground=C["border"],
+                highlightcolor=C["green_mid"]
+            )
+            widget.grid(row=0, column=col, padx=3, pady=6)
 
         self._wgs_dms_rows.append(row)
         for key in ("lat_deg", "lat_min", "lat_sec", "lon_deg", "lon_min", "lon_sec"):
@@ -2053,8 +2081,7 @@ class HATTEgsaApp:
         for row in self._wgs_dms_rows:
             row["frame"].destroy()
         self._wgs_dms_rows.clear()
-        for _ in range(4):
-            self._add_wgs_dms_row()
+        self._add_wgs_dms_row()
         self.wgs_dms_canvas.yview_moveto(0.0)
 
     def _collect_wgs_dms_points(self) -> Tuple[List[WGS84Point], List[str]]:
@@ -2074,11 +2101,11 @@ class HATTEgsaApp:
             try:
                 latitude = dms_components_to_decimal(
                     row["lat_deg"].get(), row["lat_min"].get(), row["lat_sec"].get(),
-                    row["lat_hem"].get(), "lat"
+                    self.wgs_lat_hem_var.get(), "lat"
                 )
                 longitude = dms_components_to_decimal(
                     row["lon_deg"].get(), row["lon_min"].get(), row["lon_sec"].get(),
-                    row["lon_hem"].get(), "lon"
+                    self.wgs_lon_hem_var.get(), "lon"
                 )
                 points.append(WGS84Point(name=name, latitude=latitude, longitude=longitude))
             except ValueError as exc:
@@ -3383,7 +3410,7 @@ class HATTEgsaApp:
         header.pack(fill="x")
         tk.Label(header, text="EGSA Suite", font=("Segoe UI", 17, "bold"),
                  bg=C["green_dark"], fg=C["header_fg"]).pack(anchor="w", padx=18, pady=(14, 0))
-        tk.Label(header, text=f"Έκδοση {APP_VERSION} · Εργαλεία συντεταγμένων HATT / ΕΓΣΑ87",
+        tk.Label(header, text=f"Έκδοση {APP_VERSION} · Εργαλεία συντεταγμένων HATT / ΕΓΣΑ87 / WGS84",
                  font=("Segoe UI", 9), bg=C["green_dark"], fg="#a8cdb2").pack(anchor="w", padx=18, pady=(2, 14))
 
         frame = tk.Frame(win, bg=C["white"])
@@ -3398,12 +3425,13 @@ class HATTEgsaApp:
 
         about_text = f"""ΣΚΟΠΟΣ
 
-Το EGSA Suite είναι εφαρμογή υποβοήθησης τεχνικών εργασιών για μετατροπή συντεταγμένων HATT σε ΕΓΣΑ87, διαχείριση κορυφών και ανταλλαγή γεωμετρίας με GIS, CAD και Google Earth.
+Το EGSA Suite είναι εφαρμογή υποβοήθησης τεχνικών εργασιών για μετατροπή συντεταγμένων HATT → ΕΓΣΑ87 και ΕΓΣΑ87 ↔ WGS84, διαχείριση κορυφών και ανταλλαγή γεωμετρίας με GIS, CAD και Google Earth.
 
 ΚΥΡΙΕΣ ΔΥΝΑΤΟΤΗΤΕΣ
 
 • Πολυωνυμικός μετασχηματισμός HATT → ΕΓΣΑ87 για 390 εγγραφές μετασχηματισμού (387 κωδικοί φύλλων).
 • Εισαγωγή σημείων απευθείας σε ΕΓΣΑ87.
+• Αμφίδρομη μετατροπή ΕΓΣΑ87 ↔ WGS84 (EPSG:2100 ↔ EPSG:4326) με δεκαδικές μοίρες ή μοίρες/λεπτά/δευτερόλεπτα.
 • Υπολογισμός αποστάσεων και εμβαδού.
 • Προβολή σε χάρτη, Google Maps και Google Earth Pro.
 • Εισαγωγή και εξαγωγή Shapefile και DXF.
@@ -3459,6 +3487,9 @@ class HATTEgsaApp:
 Δημιουργία πολυγώνου ΕΓΣΑ87
 Χρησιμοποίησέ την όταν οι συντεταγμένες είναι ήδη σε ΕΓΣΑ87 ή όταν εισάγονται από Shapefile ή DXF.
 
+ΕΓΣΑ87 ↔ WGS84
+Χρησιμοποίησέ την για αμφίδρομη μετατροπή μεταξύ ΕΓΣΑ87 / EPSG:2100 και WGS84 / EPSG:4326. Επίλεξε πρώτα την κατεύθυνση μετατροπής και έπειτα τη μορφή WGS84: δεκαδικές μοίρες ή μοίρες/λεπτά/δευτερόλεπτα.
+
 2. ΜΟΡΦΗ ΕΙΣΟΔΟΥ
 
 Κάθε γραμμή περιέχει:
@@ -3468,13 +3499,19 @@ class HATTEgsaApp:
 
 Χωρίς όνομα, η εφαρμογή δημιουργεί αυτόματα ονομασίες κορυφών. Υποστηρίζονται κενό, tab και ελληνικές/διεθνείς μορφές δεκαδικών. Έλεγξε πάντοτε τη σειρά X, Y.
 
+Στην καρτέλα ΕΓΣΑ87 ↔ WGS84:
+• Για δεκαδικές μοίρες η σειρά εισόδου WGS84 είναι Latitude, Longitude.
+• Για μοίρες/λεπτά/δευτερόλεπτα η εισαγωγή γίνεται σε ξεχωριστά αριθμητικά πεδία για °, ′ και ″, χωρίς να χρειάζεται πληκτρολόγηση συμβόλων.
+• Η επιλογή N/S για Latitude και E/W για Longitude είναι καθολική και εφαρμόζεται σε όλα τα σημεία του πίνακα.
+• Ο πίνακας ξεκινά με μία γραμμή και προσθέτει αυτόματα νέα κενή γραμμή μόλις αρχίσεις να συμπληρώνεις την τελευταία.
+
 3. ΥΠΟΛΟΓΙΣΜΟΣ ΚΑΙ ΕΛΕΓΧΟΣ
 
 • 1 σημείο: σημειακή γεωμετρία.
 • 2 σημεία: ανοικτό τμήμα και απόσταση.
 • 3 ή περισσότερα: κλειστό πολύγωνο και εμβαδόν.
 
-Χρησιμοποίησε «Σχήμα & Εμβαδό» για οπτικό έλεγχο της σειράς των κορυφών, των πλευρών και του κλεισίματος πριν από κάθε επαγγελματική εξαγωγή.
+Χρησιμοποίησε «Σχήμα & Εμβαδό» για οπτικό έλεγχο της σειράς των κορυφών, των πλευρών και του κλεισίματος πριν από κάθε επαγγελματική εξαγωγή. Στη ροή WGS84 η γεωμετρία μετατρέπεται εσωτερικά σε ΕΓΣΑ87 και το εμβαδόν υπολογίζεται σε ΕΓΣΑ87, όχι πάνω στις γεωγραφικές μοίρες.
 
 4. ΧΑΡΤΗΣ ΚΑΙ GOOGLE EARTH
 
