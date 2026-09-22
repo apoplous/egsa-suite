@@ -21,6 +21,7 @@ from geotoolsgr import (
     save_user_settings,
     configured_default_region,
 )
+from wgs84_utils import dms_components_to_decimal, format_wgs84_dms, parse_wgs84_points
 
 
 def P(name, x, y):
@@ -229,3 +230,59 @@ def test_official_high_order_precision_regression():
     assert HATT_COEFFICIENTS["ΒΑΡΘΟΛΟΜΙΟΝ"]["B"][5] == -12.05e-9
     assert HATT_COEFFICIENTS["ΝΗΣΟΣ ΑΝΑΦΗ"]["A"][5] == -12.44e-9
     assert HATT_COEFFICIENTS["ΝΗΣΟΙ ΠΑΞΟΙ"]["B"][5] == -14.85e-9
+
+
+def test_egsa_wgs84_roundtrip_regression():
+    tr = CoordinateTransformer()
+    original_x = Decimal("369585.94")
+    original_y = Decimal("4456429.27")
+    lon, lat = tr.egsa_to_wgs84(original_x, original_y)
+    roundtrip_x, roundtrip_y = tr.wgs84_to_egsa(lon, lat)
+    # PROJ's forward/inverse EPSG operation is not mathematically exact to the
+    # sub-millimetre after the datum/projection pipeline; centimetre-level
+    # round-trip tolerance is ample for detecting axis/order or CRS mistakes.
+    assert abs(roundtrip_x - original_x) < Decimal("0.01")
+    assert abs(roundtrip_y - original_y) < Decimal("0.01")
+
+
+def test_wgs84_decimal_parser_accepts_google_and_greek_decimal_styles():
+    points, errors = parse_wgs84_points(
+        "A 40.27212345, 22.50345678\nB 40,27222345 22,50355678",
+        "decimal",
+    )
+    assert errors == []
+    assert len(points) == 2
+    assert points[0].latitude == pytest.approx(40.27212345)
+    assert points[0].longitude == pytest.approx(22.50345678)
+    assert points[1].latitude == pytest.approx(40.27222345)
+    assert points[1].longitude == pytest.approx(22.50355678)
+
+
+def test_wgs84_dms_format_and_parser_roundtrip():
+    latitude = 40.27212345
+    longitude = 22.50345678
+    lat_dms = format_wgs84_dms(latitude, "lat")
+    lon_dms = format_wgs84_dms(longitude, "lon")
+    points, errors = parse_wgs84_points(f"A {lat_dms} {lon_dms}", "dms")
+    assert errors == []
+    assert len(points) == 1
+    assert points[0].latitude == pytest.approx(latitude, abs=3e-7)
+    assert points[0].longitude == pytest.approx(longitude, abs=3e-7)
+
+
+def test_wgs84_numeric_dms_components_for_form_input():
+    lat = dms_components_to_decimal("40", "16", "19,643", "N", "lat")
+    lon = dms_components_to_decimal("22", "30", "12.442", "E", "lon")
+    assert lat == pytest.approx(40.2721230556)
+    assert lon == pytest.approx(22.5034561111)
+    assert dms_components_to_decimal("40", "16", "19.643", "S", "lat") < 0
+    assert dms_components_to_decimal("22", "30", "12.442", "W", "lon") < 0
+
+
+def test_wgs84_numeric_dms_components_reject_invalid_fields():
+    with pytest.raises(ValueError):
+        dms_components_to_decimal("40", "60", "0", "N", "lat")
+    with pytest.raises(ValueError):
+        dms_components_to_decimal("181", "0", "0", "E", "lon")
+    with pytest.raises(ValueError):
+        dms_components_to_decimal("40", "0", "0", "E", "lat")
