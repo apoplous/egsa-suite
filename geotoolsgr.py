@@ -2090,7 +2090,12 @@ class HATTEgsaApp:
                 row_frame, width=self._dms_group_width_px, height=31, bg=bg,
                 highlightthickness=1, highlightbackground=C["border"]
             )
-            group.pack_propagate(False)
+            # Τα παιδιά αυτού του frame τοποθετούνται με grid, άρα πρέπει να
+            # απενεργοποιηθεί το grid propagation (όχι το pack propagation).
+            # Διαφορετικά τα τρία Entry ζητούν το φυσικό τους πλάτος και το
+            # LAT/LON group απλώνεται, με αποτέλεσμα να φαίνονται μόνο 3 πεδία
+            # συνολικά αντί για 3 + 3.
+            group.grid_propagate(False)
             group.pack(side="left", padx=(0, 9), pady=1)
 
             for col, key in enumerate(keys):
