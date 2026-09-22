@@ -1,5 +1,34 @@
 # Changelog
 
+## 5.5.0 — 2026-09-22
+
+**First stable release.** This release adds a dedicated EGSA87 ↔ WGS84 workflow and consolidates
+the three main application modes into a more consistent desktop UI.
+
+### Added
+- New third main tab for bidirectional **EGSA87 ↔ WGS84** conversion (`EPSG:2100 ↔ EPSG:4326`).
+- WGS84 input/output in decimal degrees and degrees/minutes/seconds (DMS).
+- Numeric DMS entry table with separate Latitude/Longitude groups, global N/S and E/W selectors,
+  automatic addition of a new row, and validation of degree/minute/second ranges.
+- WGS84 workflows reuse the existing EGSA87 geometry state for map preview, polygon/area,
+  Google Earth, Shapefile and DXF operations.
+- Regression coverage for EGSA87/WGS84 round trips and decimal/DMS parsing/formatting.
+
+### Changed
+- Replaced the old main-mode radio buttons with clearer tab-like mode selectors.
+- Unified the common **Preview / Import / Export** toolbox layout across HATT, EGSA87 and WGS84.
+- Stabilized the main window size using the largest dynamic WGS84/DMS layout so changing modes
+  does not cause abrupt resizing or hide the bottom toolbox.
+- Updated in-app About/Help text and public documentation for the WGS84 workflow.
+- Windows build workflow now also watches `wgs84_utils.py`.
+
+### Compatibility / safety
+- The HATT → EGSA87 polynomial formula and the audited HATT coefficient dataset are **unchanged**
+  from `v5.4.0-beta.3`.
+- Existing HATT and direct-EGSA87 calculation paths remain unchanged; the new WGS84 workflow is
+  additive.
+- Automated regression suite: **24 tests** on the release candidate build.
+
 ## 5.4.0-beta.3 — 2026-09-02
 
 **Critical HATT coefficient data-correction release.** Users of beta.1/beta.2 should replace those
