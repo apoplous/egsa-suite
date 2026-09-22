@@ -6,6 +6,7 @@ on:
     branches: ["main"]
     paths:
       - "geotoolsgr.py"
+      - "wgs84_utils.py"
       - "hatt_coefficients.py"
       - "services/**"
       - "kml/**"
