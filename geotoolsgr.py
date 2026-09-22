@@ -248,6 +248,16 @@ try:
     DXF_AVAILABLE = True
 except ImportError:
     DXF_AVAILABLE = False
+
+DXF_EXPORT_FORMATS = (
+    ("AutoCAD 2000", "R2000"),
+    ("AutoCAD 2004", "R2004"),
+    ("AutoCAD 2007", "R2007"),
+    ("AutoCAD 2010", "R2010"),
+    ("AutoCAD 2013", "R2013"),
+    ("AutoCAD 2018", "R2018"),
+)
+DXF_EXPORT_VERSION_CODES = {code for _, code in DXF_EXPORT_FORMATS}
 import string
 import re
 import codecs
@@ -933,7 +943,14 @@ def extract_shapefile_candidates(reader) -> list:
     return candidates
 
 
-def export_dxf_file(points: List[Point], dxf_path: str, *, include_points: bool = False, include_labels: bool = False) -> dict:
+def export_dxf_file(
+    points: List[Point],
+    dxf_path: str,
+    *,
+    include_points: bool = False,
+    include_labels: bool = False,
+    dxf_version: str = "R2010",
+) -> dict:
     """
     Εξάγει ΕΓΣΑ87 γεωμετρία σε DXF. Η polyline δημιουργείται πάντα, ενώ POINT/TEXT
     entities προστίθενται μόνο όταν ζητηθούν ρητά από τον χρήστη.
@@ -942,8 +959,10 @@ def export_dxf_file(points: List[Point], dxf_path: str, *, include_points: bool 
         raise RuntimeError("Η βιβλιοθήκη ezdxf δεν είναι διαθέσιμη σε αυτή την εγκατάσταση.")
     if len(points) < 2:
         raise ValueError("Για DXF απαιτούνται τουλάχιστον δύο σημεία ώστε να δημιουργηθεί γραμμή.")
+    if dxf_version not in DXF_EXPORT_VERSION_CODES:
+        raise ValueError(f"Μη υποστηριζόμενη έκδοση DXF: {dxf_version}")
 
-    doc = ezdxf.new('R2010')
+    doc = ezdxf.new(dxf_version)
     doc.units = dxf_units.M
     msp = doc.modelspace()
 
@@ -983,6 +1002,7 @@ def export_dxf_file(points: List[Point], dxf_path: str, *, include_points: bool 
         "geometry": "κλειστή polyline" if len(pts) >= 3 else "ανοικτή polyline",
         "layers": layers,
         "vertex_count": len(pts),
+        "dxf_version": dxf_version,
     }
 
 
@@ -2694,6 +2714,7 @@ class HATTEgsaApp:
 
         include_points_var = tk.BooleanVar(master=win, value=False)
         include_labels_var = tk.BooleanVar(master=win, value=False)
+        dxf_format_var = tk.StringVar(master=win, value="AutoCAD 2010")
 
         body = tk.Frame(win, bg=C["bg"])
         body.pack(fill="both", expand=True, padx=18, pady=16)
@@ -2707,6 +2728,19 @@ class HATTEgsaApp:
             text="Η γραμμή / το πολύγωνο εξάγεται πάντα στο layer EGSA_BOUNDARY.",
             font=("Segoe UI", 8), fg=C["text_dim"], bg=C["bg"]
         ).pack(anchor="w", pady=(2, 10))
+
+        tk.Label(
+            body, text="Έκδοση DXF",
+            font=("Segoe UI", 9), fg=C["text"], bg=C["bg"]
+        ).pack(anchor="w", pady=(0, 3))
+        dxf_format_combo = ttk.Combobox(
+            body,
+            textvariable=dxf_format_var,
+            values=[label for label, _ in DXF_EXPORT_FORMATS],
+            state="readonly",
+            width=22,
+        )
+        dxf_format_combo.pack(anchor="w", pady=(0, 10))
 
         tk.Checkbutton(
             body, text="Εξαγωγή ξεχωριστών σημείων κορυφών (POINT)",
@@ -2726,7 +2760,13 @@ class HATTEgsaApp:
         buttons.pack(fill="x", pady=(14, 0))
 
         def confirm():
-            result["value"] = (include_points_var.get(), include_labels_var.get())
+            selected_label = dxf_format_var.get()
+            version_map = dict(DXF_EXPORT_FORMATS)
+            result["value"] = (
+                include_points_var.get(),
+                include_labels_var.get(),
+                version_map[selected_label],
+            )
             win.destroy()
 
         def cancel():
@@ -2771,7 +2811,7 @@ class HATTEgsaApp:
         options = self._choose_dxf_export_options()
         if options is None:
             return
-        include_points, include_labels = options
+        include_points, include_labels, dxf_version = options
 
         dxf_path = filedialog.asksaveasfilename(
             defaultextension=".dxf",
@@ -2786,17 +2826,22 @@ class HATTEgsaApp:
                 self.egsa_points, dxf_path,
                 include_points=include_points,
                 include_labels=include_labels,
+                dxf_version=dxf_version,
+            )
+            version_label = next(
+                label for label, code in DXF_EXPORT_FORMATS if code == info["dxf_version"]
             )
             messagebox.showinfo(
                 "Εξαγωγή DXF",
                 f"Η εξαγωγή ολοκληρώθηκε επιτυχώς.\n\n"
                 f"Γεωμετρία: {info['geometry']}\n"
                 f"Layers: {', '.join(info['layers'])}\n"
+                f"Έκδοση DXF: {version_label} ({info['dxf_version']})\n"
                 f"Σύστημα: ΕΓΣΑ87 · μονάδες σε μέτρα"
             )
             logger.info(
-                "DXF exported: %s points=%s labels=%s",
-                dxf_path, include_points, include_labels
+                "DXF exported: %s version=%s points=%s labels=%s",
+                dxf_path, dxf_version, include_points, include_labels
             )
 
         except Exception as e:
