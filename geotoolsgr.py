@@ -1757,44 +1757,56 @@ class HATTEgsaApp:
             style="Modern.TCombobox"
         ).pack(side="left", pady=4)
 
-        dms_header = tk.Frame(self.wgs_dms_input_frame, bg=C["bg"])
-        dms_header.pack(fill="x", pady=(0, 4))
+        # Ίδιες σταθερές διαστάσεις χρησιμοποιούνται και στις επικεφαλίδες
+        # και στις γραμμές, ώστε LATITUDE / LONGITUDE να ευθυγραμμίζονται ακριβώς
+        # με τα αντίστοιχα τρία πεδία ανεξάρτητα από γραμματοσειρά/DPI.
+        self._dms_name_width_px = 60
+        self._dms_group_width_px = 178
 
+        dms_header = tk.Frame(self.wgs_dms_input_frame, bg=C["bg"])
+        dms_header.pack(fill="x", padx=5, pady=(0, 4))
+
+        name_header = tk.Frame(
+            dms_header, width=self._dms_name_width_px, height=46, bg=C["bg"]
+        )
+        name_header.pack_propagate(False)
+        name_header.pack(side="left", padx=(0, 7))
         tk.Label(
-            dms_header, text="Σημείο", width=8,
+            name_header, text="Σημείο",
             font=("Segoe UI", 7, "bold"), fg=C["text_dim"], bg=C["bg"],
             anchor="center"
-        ).grid(row=0, column=0, rowspan=2, padx=(4, 6), sticky="ns")
+        ).pack(fill="both", expand=True)
 
-        tk.Label(
-            dms_header, text="LATITUDE",
-            font=("Segoe UI", 7, "bold"), fg=C["green_dark"], bg=C["green_light"],
-            padx=8, pady=2
-        ).grid(row=0, column=1, columnspan=3, padx=(0, 5), sticky="ew")
+        def add_dms_header_group(title: str):
+            group = tk.Frame(
+                dms_header, width=self._dms_group_width_px, height=46,
+                bg=C["green_light"],
+                highlightthickness=1, highlightbackground=C["accent"]
+            )
+            group.pack_propagate(False)
+            group.pack(side="left", padx=(0, 9))
 
-        tk.Frame(dms_header, bg=C["border"], width=2).grid(
-            row=0, column=4, rowspan=2, padx=5, sticky="ns"
-        )
-
-        tk.Label(
-            dms_header, text="LONGITUDE",
-            font=("Segoe UI", 7, "bold"), fg=C["green_dark"], bg=C["green_light"],
-            padx=8, pady=2
-        ).grid(row=0, column=5, columnspan=3, padx=(5, 0), sticky="ew")
-
-        for col, (label, width) in enumerate([("°", 6), ("′", 5), ("″", 9)], start=1):
             tk.Label(
-                dms_header, text=label, width=width,
-                font=("Segoe UI", 7, "bold"), fg=C["text_dim"], bg=C["bg"],
-                anchor="center"
-            ).grid(row=1, column=col, padx=1, pady=(2, 0))
+                group, text=title,
+                font=("Segoe UI", 8, "bold"),
+                fg=C["green_dark"], bg=C["green_light"]
+            ).pack(fill="x", pady=(3, 0))
 
-        for col, (label, width) in enumerate([("°", 6), ("′", 5), ("″", 9)], start=5):
-            tk.Label(
-                dms_header, text=label, width=width,
-                font=("Segoe UI", 7, "bold"), fg=C["text_dim"], bg=C["bg"],
-                anchor="center"
-            ).grid(row=1, column=col, padx=1, pady=(2, 0))
+            symbols = tk.Frame(group, bg=C["green_light"])
+            symbols.pack(fill="both", expand=True, padx=3, pady=(0, 2))
+            for col, symbol in enumerate(("°", "′", "″")):
+                symbols.grid_columnconfigure(col, weight=(5, 4, 7)[col], uniform="dms")
+                tk.Label(
+                    symbols, text=symbol,
+                    font=("Segoe UI", 11, "bold"),
+                    fg=C["green_dark"], bg=C["green_light"],
+                    anchor="center"
+                ).grid(row=0, column=col, sticky="nsew", padx=1)
+            symbols.grid_rowconfigure(0, weight=1)
+            return group
+
+        add_dms_header_group("LATITUDE")
+        add_dms_header_group("LONGITUDE")
 
         dms_body_outer = tk.Frame(
             self.wgs_dms_input_frame, bg=C["output_bg"],
@@ -2056,8 +2068,14 @@ class HATTEgsaApp:
             "lon_sec": tk.StringVar(master=self.root),
         }
 
+        name_holder = tk.Frame(
+            row_frame, width=self._dms_name_width_px, height=31,
+            bg=C["output_bg"]
+        )
+        name_holder.pack_propagate(False)
+        name_holder.pack(side="left", padx=(0, 7), pady=1)
         name_entry = tk.Entry(
-            row_frame, textvariable=row["name"], width=8,
+            name_holder, textvariable=row["name"],
             font=("Consolas", 9, "bold"), justify="center",
             bg=C["white"], fg=C["green_dark"],
             relief="flat", bd=0,
@@ -2065,25 +2083,28 @@ class HATTEgsaApp:
             highlightbackground=C["border"],
             highlightcolor=C["green_mid"]
         )
-        name_entry.pack(side="left", padx=(0, 7), pady=3)
+        name_entry.pack(fill="both", expand=True, pady=2)
 
         def add_group(keys, bg):
             group = tk.Frame(
-                row_frame, bg=bg,
+                row_frame, width=self._dms_group_width_px, height=31, bg=bg,
                 highlightthickness=1, highlightbackground=C["border"]
             )
+            group.pack_propagate(False)
             group.pack(side="left", padx=(0, 9), pady=1)
-            widths = (6, 5, 9)
-            for key, width in zip(keys, widths):
+
+            for col, key in enumerate(keys):
+                group.grid_columnconfigure(col, weight=(5, 4, 7)[col], uniform="dms")
                 tk.Entry(
-                    group, textvariable=row[key], width=width,
+                    group, textvariable=row[key],
                     font=("Consolas", 9), justify="center",
                     bg=C["white"], fg=C["text"],
                     relief="flat", bd=0,
                     highlightthickness=1,
                     highlightbackground=C["border"],
                     highlightcolor=C["green_mid"]
-                ).pack(side="left", padx=2, pady=3)
+                ).grid(row=0, column=col, sticky="nsew", padx=2, pady=3)
+            group.grid_rowconfigure(0, weight=1)
             return group
 
         row["lat_group"] = add_group(("lat_deg", "lat_min", "lat_sec"), C["green_light"])
