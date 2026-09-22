@@ -1846,8 +1846,8 @@ class HATTEgsaApp:
         self._wgs_dms_rows = []
         self._add_wgs_dms_row()
 
-        self.wgs_text_controls = tk.Frame(frame, bg=C["bg"])
-        self.wgs_text_controls.pack(pady=(5, 0), **PAD)
+        self.wgs_text_controls = tk.Frame(self.wgs_input_host, bg=C["bg"])
+        self.wgs_text_controls.pack(pady=(5, 0))
         for txt, cmd in [
             ("📋  Επικόλληση", lambda: self._paste_to(self.wgs_input)),
             ("✕  Καθαρισμός", self._clear_wgs84_fields),
@@ -1859,8 +1859,8 @@ class HATTEgsaApp:
                       padx=10, pady=4, cursor="hand2"
                       ).pack(side="left", padx=(0, 6))
 
-        self.wgs_dms_controls = tk.Frame(frame, bg=C["bg"])
-        self.wgs_dms_controls.pack(pady=(5, 0), **PAD)
+        self.wgs_dms_controls = tk.Frame(self.wgs_input_host, bg=C["bg"])
+        self.wgs_dms_controls.pack(pady=(5, 0))
         for txt, cmd in [
             ("＋  Νέα γραμμή", self._add_wgs_dms_row),
             ("−  Τελευταία γραμμή", self._remove_last_wgs_dms_row),
@@ -2023,10 +2023,10 @@ class HATTEgsaApp:
 
         if use_dms_table:
             self.wgs_dms_input_frame.pack(fill="x")
-            self.wgs_dms_controls.pack(pady=(5, 0), padx=12)
+            self.wgs_dms_controls.pack(pady=(5, 0))
         else:
             self.wgs_text_input_frame.pack(fill="x")
-            self.wgs_text_controls.pack(pady=(5, 0), padx=12)
+            self.wgs_text_controls.pack(pady=(5, 0))
 
         if direction == "EGSA_TO_WGS":
             self.wgs_input_title_var.set("Σημεία εισόδου σε ΕΓΣΑ87")
