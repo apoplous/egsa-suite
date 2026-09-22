@@ -6,6 +6,7 @@ import pytest
 
 from geotoolsgr import (
     CoordinateTransformer,
+    DXF_EXPORT_FORMATS,
     HATT_COEFFICIENTS,
     InputParser,
     Point,
@@ -178,6 +179,31 @@ def test_dxf_export_options_control_points_and_labels(tmp_path: Path):
     msp = doc.modelspace()
     assert len(msp.query("POINT")) == 3
     assert len(msp.query("TEXT")) == 3
+
+
+
+@pytest.mark.parametrize("label,dxf_version", DXF_EXPORT_FORMATS)
+def test_dxf_export_writes_selected_version(tmp_path: Path, label: str, dxf_version: str):
+    pytest.importorskip("ezdxf")
+    import ezdxf
+
+    pts = [P("A", 400000, 4400000), P("B", 400100, 4400000), P("C", 400100, 4400100)]
+    dxf_path = tmp_path / f"{dxf_version}.dxf"
+
+    info = export_dxf_file(pts, str(dxf_path), dxf_version=dxf_version)
+    doc = ezdxf.readfile(dxf_path)
+
+    assert info["dxf_version"] == dxf_version
+    assert doc.dxfversion == ezdxf.new(dxf_version).dxfversion
+    assert len(doc.modelspace().query("LWPOLYLINE")) == 1
+
+
+def test_dxf_export_rejects_unknown_version(tmp_path: Path):
+    pytest.importorskip("ezdxf")
+    pts = [P("A", 400000, 4400000), P("B", 400100, 4400000)]
+
+    with pytest.raises(ValueError, match="Μη υποστηριζόμενη έκδοση DXF"):
+        export_dxf_file(pts, str(tmp_path / "invalid.dxf"), dxf_version="R12")
 
 
 def test_official_hatt_coefficient_corrections_regression():
