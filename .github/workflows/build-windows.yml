@@ -3,9 +3,10 @@ name: build-windows
 on:
   workflow_dispatch:
   push:
-    branches: ["main"]
+    branches: ["main", "feature/wgs84-tab"]
     paths:
       - "geotoolsgr.py"
+      - "wgs84_utils.py"
       - "hatt_coefficients.py"
       - "services/**"
       - "kml/**"
@@ -57,7 +58,7 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ steps.version.outputs.version }}"
-          $name = "EGSA_Suite_v${version}_Windows_x64"
+          $name = "EGSA_Suite_WGS84_UI_preview_Windows_x64"
           $stage = Join-Path "release" $name
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
           Copy-Item "dist/EGSA_Suite.exe" (Join-Path $stage "EGSA_Suite.exe")
@@ -77,9 +78,9 @@ jobs:
       - name: Upload Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: EGSA_Suite_v${{ steps.version.outputs.version }}_Windows_x64
+          name: EGSA_Suite_WGS84_UI_preview_Windows_x64
           path: |
-            release/EGSA_Suite_v${{ steps.version.outputs.version }}_Windows_x64.zip
+            release/EGSA_Suite_WGS84_UI_preview_Windows_x64.zip
             release/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
