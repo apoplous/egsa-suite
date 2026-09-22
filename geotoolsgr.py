@@ -2175,21 +2175,46 @@ class HATTEgsaApp:
                  ).pack(side="right", padx=10, pady=3)
 
     def _stabilize_main_window_size(self) -> None:
-        """Κρατά σταθερό το κύριο παράθυρο στο μέγεθος της μεγαλύτερης καρτέλας."""
+        """Κρατά σταθερό το κύριο παράθυρο στο μέγεθος της μεγαλύτερης πραγματικής κατάστασης UI."""
         frames = [self.frame_HATT, self.frame_egsa, self.frame_wgs84]
         selected = self.mode_var.get()
+        saved_wgs_direction = self.wgs_direction_var.get()
+        saved_wgs_format = self.wgs_format_var.get()
         max_width = 0
         max_height = 0
 
-        # Το root είναι ακόμη κρυφό πίσω από το splash, οπότε η μέτρηση δεν
-        # προκαλεί ορατό τρεμόπαιγμα στον χρήστη.
-        for candidate in frames:
+        # Το root είναι ακόμη κρυφό πίσω από το splash, οπότε μπορούμε να
+        # μετρήσουμε όλες τις καρτέλες χωρίς ορατό resize/trembling.
+        for candidate in (self.frame_HATT, self.frame_egsa):
             for item in frames:
                 item.pack_forget()
             candidate.pack(fill="x", pady=5)
             self.root.update_idletasks()
             max_width = max(max_width, self.root.winfo_reqwidth())
             max_height = max(max_height, self.root.winfo_reqheight())
+
+        # Η WGS84 καρτέλα έχει δυναμικό layout. Η μεγαλύτερη κατάστασή της
+        # είναι WGS84 -> ΕΓΣΑ87 με DMS table· αν μετρηθεί μόνο η default
+        # decimal/EGSA->WGS κατάσταση, τα κάτω εργαλεία κόβονται μέχρι ο
+        # χρήστης να μεγαλώσει χειροκίνητα το παράθυρο.
+        for item in frames:
+            item.pack_forget()
+        self.frame_wgs84.pack(fill="x", pady=5)
+        for direction, fmt in (
+            ("EGSA_TO_WGS", "decimal"),
+            ("WGS_TO_EGSA", "dms"),
+        ):
+            self.wgs_direction_var.set(direction)
+            self.wgs_format_var.set(fmt)
+            self._update_wgs84_ui()
+            self.root.update_idletasks()
+            max_width = max(max_width, self.root.winfo_reqwidth())
+            max_height = max(max_height, self.root.winfo_reqheight())
+
+        # Επαναφορά της πραγματικής κατάστασης πριν εμφανιστεί το root.
+        self.wgs_direction_var.set(saved_wgs_direction)
+        self.wgs_format_var.set(saved_wgs_format)
+        self._update_wgs84_ui()
 
         for item in frames:
             item.pack_forget()
