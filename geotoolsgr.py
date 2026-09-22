@@ -1417,7 +1417,7 @@ class HATTEgsaApp:
                   ).pack(side="left", padx=(0, 5))
         style_box = ttk.Combobox(
             row1, textvariable=self.map_style_var,
-            values=["OpenStreetMap", "ESRI Satellite", "Google Maps"],
+            values=["ESRI Satellite", "Google Maps"],
             width=12, state="readonly", style="Modern.TCombobox"
         )
         style_box.set("ESRI Satellite")
@@ -1576,7 +1576,7 @@ class HATTEgsaApp:
                   ).pack(side="left", padx=(0, 5))
         style_box = ttk.Combobox(
             row1, textvariable=self.map_style_var,
-            values=["OpenStreetMap", "ESRI Satellite", "Google Maps"],
+            values=["ESRI Satellite", "Google Maps"],
             width=12, state="readonly", style="Modern.TCombobox"
         )
         style_box.set("ESRI Satellite")
@@ -1929,7 +1929,7 @@ class HATTEgsaApp:
                   ).pack(side="left", padx=(0, 5))
         style_box = ttk.Combobox(
             row1, textvariable=self.map_style_var,
-            values=["OpenStreetMap", "ESRI Satellite", "Google Maps"],
+            values=["ESRI Satellite", "Google Maps"],
             width=12, state="readonly", style="Modern.TCombobox"
         )
         style_box.set("ESRI Satellite")
