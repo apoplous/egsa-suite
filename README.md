@@ -13,7 +13,8 @@ Google Earth Pro integration.
 
 Portable έκδοση για Windows x64. Δεν απαιτείται εγκατάσταση Python.
 
-![EGSA Suite UI](docs/egsa-suite-ui.png)
+<img width="489" height="890" alt="Screenshot 2026-09-22 132355" src="https://github.com/user-attachments/assets/e3d684bc-7443-4a54-9d40-66d631da5e69" />
+
 
 ## Γιατί υπάρχει
 
