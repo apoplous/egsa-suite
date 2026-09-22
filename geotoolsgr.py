@@ -1815,7 +1815,7 @@ class HATTEgsaApp:
         dms_body_outer.pack(fill="x")
 
         self.wgs_dms_canvas = tk.Canvas(
-            dms_body_outer, height=158, bg=C["output_bg"],
+            dms_body_outer, height=128, bg=C["output_bg"],
             highlightthickness=0, bd=0
         )
         dms_scroll = tk.Scrollbar(
@@ -1903,7 +1903,7 @@ class HATTEgsaApp:
                   ).pack(side="right")
 
         self.wgs_output = tk.Text(
-            frame, width=48, height=8,
+            frame, width=48, height=5,
             font=("Consolas", 9),
             bg=C["output_bg"], fg=C["text"],
             state="disabled", relief="flat", bd=0,
@@ -1931,65 +1931,60 @@ class HATTEgsaApp:
             ).pack(fill="x")
 
         # ── Same geometry actions, always backed by EGSA87 internally ─────────
-        tk.Frame(frame, bg=C["border"], height=1).pack(fill="x", padx=12, pady=(12, 0))
+        tk.Frame(frame, bg=C["border"], height=1).pack(fill="x", padx=12, pady=(8, 0))
         act_outer = tk.Frame(frame, bg=C["bg"])
-        act_outer.pack(fill="x", padx=12, pady=(8, 10))
+        act_outer.pack(fill="x", padx=12, pady=(6, 7))
 
         tk.Label(act_outer, text="ΠΡΟΒΟΛΗ · ΕΙΣΑΓΩΓΗ · ΕΞΑΓΩΓΗ",
                  font=("Segoe UI", 7, "bold"), fg=C["text_dim"],
-                 bg=C["bg"]).pack(anchor="w", pady=(0, 6))
+                 bg=C["bg"]).pack(anchor="w", pady=(0, 4))
 
         row1 = tk.Frame(act_outer, bg=C["bg"])
         row1.pack(fill="x", pady=(0, 4))
         tk.Button(row1, text="🗺  Προβολή σε Χάρτη",
                   command=self._preview_map,
-                  font=("Segoe UI", 9), relief="flat", bd=0,
+                  font=("Segoe UI", 8), relief="flat", bd=0,
                   bg=C["green_light"], fg=C["green_dark"],
                   activebackground=C["accent"],
-                  padx=10, pady=5, cursor="hand2"
-                  ).pack(side="left", padx=(0, 6))
+                  padx=8, pady=4, cursor="hand2"
+                  ).pack(side="left", padx=(0, 5))
         style_box = ttk.Combobox(
             row1, textvariable=self.map_style_var,
             values=["OpenStreetMap", "ESRI Satellite", "Google Maps"],
-            width=14, state="readonly", style="Modern.TCombobox"
+            width=12, state="readonly", style="Modern.TCombobox"
         )
         style_box.set("ESRI Satellite")
-        style_box.pack(side="left")
-
-        row2 = tk.Frame(act_outer, bg=C["bg"])
-        row2.pack(fill="x", pady=(0, 4))
-        tk.Button(row2, text="📐  Σχήμα & Εμβαδό",
+        style_box.pack(side="left", padx=(0, 6))
+        tk.Button(row1, text="📐  Σχήμα & Εμβαδό",
                   command=self._preview_polygon,
                   font=("Segoe UI", 8), relief="flat", bd=0,
                   bg=C["green_light"], fg=C["green_dark"],
                   activebackground=C["accent"],
-                  padx=8, pady=5, cursor="hand2"
+                  padx=8, pady=4, cursor="hand2"
                   ).pack(side="left")
 
-        row3 = tk.Frame(act_outer, bg=C["bg"])
-        row3.pack(fill="x", pady=(2, 4))
-        tk.Label(row3, text="Εισαγωγή:", font=("Segoe UI", 8),
-                 fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(0, 6))
+        row2 = tk.Frame(act_outer, bg=C["bg"])
+        row2.pack(fill="x")
+        tk.Label(row2, text="Εισαγωγή:", font=("Segoe UI", 8),
+                 fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(0, 5))
         for txt, cmd in [("Shapefile", self._import_shp), ("DXF", self._import_dxf)]:
-            tk.Button(row3, text=txt, command=cmd,
+            tk.Button(row2, text=txt, command=cmd,
                       font=("Segoe UI", 8), relief="flat", bd=0,
                       bg=C["input_bg"], fg=C["green_dark"],
                       highlightthickness=1, highlightbackground=C["border"],
                       activebackground=C["green_light"],
-                      padx=12, pady=4, cursor="hand2"
-                      ).pack(side="left", padx=(0, 5))
+                      padx=8, pady=3, cursor="hand2"
+                      ).pack(side="left", padx=(0, 4))
 
-        row4 = tk.Frame(act_outer, bg=C["bg"])
-        row4.pack(fill="x", pady=(2, 0))
-        tk.Label(row4, text="Εξαγωγή:", font=("Segoe UI", 8),
-                 fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(0, 6))
+        tk.Label(row2, text="Εξαγωγή:", font=("Segoe UI", 8),
+                 fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(8, 5))
         for txt, cmd in [("Shapefile", self._export_shapefile), ("DXF", self._export_dxf)]:
-            tk.Button(row4, text=txt, command=cmd,
+            tk.Button(row2, text=txt, command=cmd,
                       font=("Segoe UI", 8), relief="flat", bd=0,
                       bg=C["green_light"], fg=C["green_dark"],
                       activebackground=C["accent"],
-                      padx=12, pady=4, cursor="hand2"
-                      ).pack(side="left", padx=(0, 5))
+                      padx=8, pady=3, cursor="hand2"
+                      ).pack(side="left", padx=(0, 4))
 
         self._update_wgs84_ui()
         return frame
