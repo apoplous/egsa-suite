@@ -1,5 +1,14 @@
 # Changelog
 
+## 5.6.1 — 2026-10-05
+
+### Fixed
+- Named coordinate input now accepts mixed tabs and spaces, including pasted Excel rows with Greek point names and decimal commas. This fixes `decimal.ConversionSyntax` when a name is separated by a tab and X/Y by a space.
+- Added a regression test for this input format.
+
+### Compatibility
+- HATT coefficients, transformations, geometry, SHP/DXF exports and maps are unchanged.
+
 ## 5.6.0 — 2026-09-22
 
 ### Added
