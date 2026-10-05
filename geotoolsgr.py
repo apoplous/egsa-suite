@@ -673,20 +673,28 @@ class InputParser:
     @staticmethod
     def smart_split(line: str) -> List[str]:
         """
-        Έξυπνο split με δοκιμή διαφόρων διαχωριστών.
-        
-        Args:
-            line: Γραμμή προς ανάλυση
-            
-        Returns:
-            Λίστα με τα μέρη της γραμμής
+        Έξυπνο split με υποστήριξη μικτής χρήσης tab/κενών.
+
+        Τα δεκαδικά με ελληνικό κόμμα (π.χ. 373966,246) δεν πρέπει να
+        αντιμετωπίζονται ως διαχωριστές πεδίων. Για αυτό:
+        1. το ';' έχει προτεραιότητα ως ασφαλής delimiter,
+        2. κάθε συνδυασμός whitespace (space/tab) χωρίζει πεδία ενιαία,
+        3. το ',' χρησιμοποιείται ως delimiter μόνο όταν δεν υπάρχει whitespace.
         """
-        for delim in ["\t", ";", " ", ","]:
-            if delim in line:
-                parts = [p for p in line.split(delim) if p.strip()]
-                if len(parts) >= 2:
-                    return parts
-        return line.split()
+        stripped = line.strip()
+        if not stripped:
+            return []
+
+        if ";" in stripped:
+            return [p.strip() for p in stripped.split(";") if p.strip()]
+
+        if re.search(r"\s", stripped):
+            return [p for p in re.split(r"\s+", stripped) if p]
+
+        if "," in stripped:
+            return [p.strip() for p in stripped.split(",") if p.strip()]
+
+        return [stripped]
     
     @staticmethod
     def parse_points(text: str, auto_names: bool = True) -> Tuple[List[Point], List[str]]:
