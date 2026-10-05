@@ -63,6 +63,17 @@ def test_parser_accepts_greek_decimal_comma():
     assert pts[0].y == Decimal("678.90")
 
 
+def test_parser_accepts_named_points_with_mixed_tab_and_spaces():
+    text = "Β\t373966,246 4439120,439\nΗ\t374002,98 4439144,208"
+    pts, errors = InputParser.parse_points(text)
+    assert errors == []
+    assert [p.name for p in pts] == ["Β", "Η"]
+    assert pts[0].x == Decimal("373966.246")
+    assert pts[0].y == Decimal("4439120.439")
+    assert pts[1].x == Decimal("374002.98")
+    assert pts[1].y == Decimal("4439144.208")
+
+
 def test_hatt_angle_is_degrees_minutes_not_decimal_degrees():
     assert format_hatt_angle(40.15) == "40°15′"
     assert format_hatt_angle(-1.45) == "−1°45′"
